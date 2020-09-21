@@ -145,10 +145,6 @@ typedef unsigned char bit;
 // acceptable game speed.
 //
 
-#define CLK4MHZ   4000000
-//#define CLK250KHZ  250000
-
-
 
 #define ROWS  ((unsigned char) 24)
 #define COLS  ((unsigned char) 10)
