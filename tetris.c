@@ -133,7 +133,8 @@
 #include <unistd.h>
 //#include <termios.h>
 //#include <string.h>
-#include "tetris.h"
+//#include "tetris.h"
+typedef unsigned char bit;
 
 // NOTE: YOU MUST SELECT AND UNCOMMENT ONE OF THOSE MACROS.
 // Depending on the selected clock-rate of course - a 4 MHz clock
@@ -534,6 +535,210 @@ void remove_row( unsigned char row ) {
   }
 }
 
+/**
+ * initialize the 16F628 serial communication registers.
+ * We also put some timer initialization here. 
+ */
+void vt100_initialize( void ) {
+#if 0
+  struct termios orig_termios, new_termios;
+
+  /* take two copies - one for now, one for later */
+  tcgetattr(0, &orig_termios);
+  memcpy(&new_termios, &orig_termios, sizeof(new_termios));
+
+    /* register cleanup handler, and set the new terminal mode */
+
+  cfmakeraw(&new_termios);
+  tcsetattr(0, TCSANOW, &new_termios);
+#endif
+}
+
+
+/** 
+ * transmit the given character via tx to the terminal.
+ * We assume that we can immediately put the new data into the transmit
+ * buffer register TXREG. Afterwards, we should wait until the TRMT
+ * (TXSTA<1>) bit is 1 to indicate that TSR is empty again.
+ * Unfortunately, this doesn't work reliably with the Hades 16F628
+ * simulation model, so that we use an explicit wait loop instead.
+ * You will have to update the wait loop limit when chaning the
+ * RS232 communication parameters (baudrate) and PIC input clock
+ * frequency.
+ */
+void vt100_putc( unsigned char ch ) {
+  putchar(ch);
+  fflush(stdout);
+}
+
+
+/**
+ * send "ESC [ ? 2 l" to put a VT100 into VT52 mode
+ * and "ESC f" to hide the cursor.
+ */
+void vt100_enter_vt52_mode() {
+  // VT100: enter VT52 mode
+  vt100_putc( 27 );	 
+  vt100_putc( '[' );
+  vt100_putc( '?' );
+  vt100_putc( '2' );
+  vt100_putc( 'l' );
+  
+  // VT52: cursor off
+  vt100_putc( 27 );
+  vt100_putc( 'f' );
+}
+
+
+/**
+ * move the VT100 cursor to the given position.
+ * This is done by sending 'ESC Y l c'
+ * NOTE: VT52 expects an offset of 32 for the l and c values.
+ */
+void vt100_goto( unsigned char row, unsigned char col ) {
+  vt100_putc( 27 );   // ESC
+  vt100_putc( 'Y' );  // ESC-Y
+  vt100_putc( (row+32) );
+  vt100_putc( (col+32) );
+}
+
+
+/** 
+ * request a VT100 cursor-home command on the terminal via tx.
+ * We send the VT100/VT52 command 'ESC H'.
+ */
+void vt100_cursor_home( void ) {
+  vt100_putc( 27 );    // ESC
+  vt100_putc( 'H' );
+}
+
+
+/**
+ * helper function to convert a hex-digit into a character 0..9 a..f
+ */
+unsigned char vt100_hex( unsigned char val ) {
+  if (val <= 9) return '0' + val;
+  else          return ('a'-10) + val;	
+}
+
+
+/**
+ * print the given integer value as two hex-digits.
+ */
+void vt100_xtoa( unsigned char val ) {
+  unsigned char c;
+  c = val >> 4;
+  vt100_putc( vt100_hex( c ));
+  c = val & 0x0f;
+  vt100_putc( vt100_hex( c ));
+}
+
+
+/**
+ * display (or erase) the current block at its current position,
+ * depending on whether the paintMode parameter is PAINT_ACTIVE,
+ * PAINT_FIXED, or ERASE.
+ * This method just paints the active pixels from the block,
+ * but nothing else (no game board, no borders, no score).
+ * To achieve the best performance, we use the VT52 cursor
+ * positioning commands via vt100_goto() for each of the
+ * (always four) visible pixels of the block.
+ */
+void display_block( unsigned char paintMode ) {
+  unsigned char i, j, ch;
+  unsigned char rr, cc;
+  
+  for( i=0; i < 4; i++ ) {
+  	rr = current_row + i;
+  	if (rr >= ROWS) continue; // out of range
+
+  	for ( j=0; j < 4; j++ ) {
+  	  cc = XOFFSET + current_col + j;
+      if (cc >= XLIMIT) continue; // out of range
+  		
+  	  if (getBlockPixel(i,j)) {
+        vt100_goto( rr, cc );
+        if     (paintMode == PAINT_ACTIVE) vt100_putc( 'H' );
+        else if (paintMode == PAINT_FIXED) vt100_putc( 'X' );
+        else                               vt100_putc( ' ' );  	  	
+  	  }	
+  	}
+  	
+  	// HACK:
+  	// extra goto because neither xterm/seycon nor Winxp hyperterm
+  	// understand the VT52 "cursor off" command, and the blinking
+  	// cursor at the end of a block is really annoying...
+  	// a "real" VT100/VT52 does work fine without this.
+  	vt100_goto( 1, 1 ); 
+  }
+} // display_block
+
+
+/** 
+ * display the current game board position on the terminal.
+ * This method redraws the whole gaming board including borders.
+ * Use another call to display_block() to also draw the current block.
+ */
+void display_board( void ) {
+  unsigned char r,c;
+  unsigned char ch;
+
+  vt100_cursor_home();
+  for( r=0; r < ROWS; r++ ) {
+
+    vt100_goto( r, 2 );
+
+    vt100_putc( '|' );            // one row of the board: border, data, border
+
+    for( c=0; c < COLS; c++ ) {
+      ch = occupied(r,c) ? 'X' : ' ';
+      vt100_putc( ch );
+    }
+    vt100_putc( '|' );
+    
+    // a real VT52 wants both linefeed (10) and carriage-return (13).
+    // We don't want a linefeed after the last row, because the terminal
+    // would scroll up then... anyway, we use vt100_goto() now.
+    // 
+    // vt100_putc( 13 );
+    // vt100_putc( 10 );
+  }
+}
+
+
+/**
+ * display the current level and score values on the terminal.
+ */
+void display_score( void ) {
+  vt100_goto( 20, 40 );
+/* uncommented to free some program memory for more important things...
+  vt100_putc( 'L' );
+  vt100_putc( 'e' );
+  vt100_putc( 'v' );
+  vt100_putc( 'e' );
+  vt100_putc( 'l' );
+  vt100_putc( ':' );
+  vt100_putc( ' ' );
+*/
+  vt100_xtoa( level );
+  
+  vt100_putc( ' ' );
+/*
+  vt100_goto( 21, 40 );
+  vt100_putc( 'S' );
+  vt100_putc( 'c' );
+  vt100_putc( 'o' );
+  vt100_putc( 'r' );
+  vt100_putc( 'e' );
+  vt100_putc( ':' );
+  vt100_putc( ' ' );
+*/
+  vt100_xtoa( (score>>8) );
+  vt100_xtoa( (score) );
+//vt100_putc( '\n' );
+
+}
+
 
 /**
  * check for completed rows and remove them from the gaming board.
@@ -641,135 +846,7 @@ void cmd_move_down( void ) {
 }
 
 
-/**
- * initialize the 16F628 serial communication registers.
- * We also put some timer initialization here. 
- */
-void vt100_initialize( void ) {
-#if 0
-  struct termios orig_termios, new_termios;
 
-  /* take two copies - one for now, one for later */
-  tcgetattr(0, &orig_termios);
-  memcpy(&new_termios, &orig_termios, sizeof(new_termios));
-
-    /* register cleanup handler, and set the new terminal mode */
-
-  cfmakeraw(&new_termios);
-  tcsetattr(0, TCSANOW, &new_termios);
-#endif
-}
-
-
-/**
- * send "ESC [ ? 2 l" to put a VT100 into VT52 mode
- * and "ESC f" to hide the cursor.
- */
-void vt100_enter_vt52_mode() {
-  // VT100: enter VT52 mode
-  vt100_putc( 27 );	 
-  vt100_putc( '[' );
-  vt100_putc( '?' );
-  vt100_putc( '2' );
-  vt100_putc( 'l' );
-  
-  // VT52: cursor off
-  vt100_putc( 27 );
-  vt100_putc( 'f' );
-}
-
-
-/** 
- * transmit the given character via tx to the terminal.
- * We assume that we can immediately put the new data into the transmit
- * buffer register TXREG. Afterwards, we should wait until the TRMT
- * (TXSTA<1>) bit is 1 to indicate that TSR is empty again.
- * Unfortunately, this doesn't work reliably with the Hades 16F628
- * simulation model, so that we use an explicit wait loop instead.
- * You will have to update the wait loop limit when chaning the
- * RS232 communication parameters (baudrate) and PIC input clock
- * frequency.
- */
-void vt100_putc( unsigned char ch ) {
-  putchar(ch);
-  fflush(stdout);
-}
-
-
-/**
- * move the VT100 cursor to the given position.
- * This is done by sending 'ESC Y l c'
- * NOTE: VT52 expects an offset of 32 for the l and c values.
- */
-void vt100_goto( unsigned char row, unsigned char col ) {
-  vt100_putc( 27 );   // ESC
-  vt100_putc( 'Y' );  // ESC-Y
-  vt100_putc( (row+32) );
-  vt100_putc( (col+32) );
-}
-
-
-/** 
- * request a VT100 cursor-home command on the terminal via tx.
- * We send the VT100/VT52 command 'ESC H'.
- */
-void vt100_cursor_home( void ) {
-  vt100_putc( 27 );    // ESC
-  vt100_putc( 'H' );
-}
-
-
-/**
- * helper function to convert a hex-digit into a character 0..9 a..f
- */
-unsigned char vt100_hex( unsigned char val ) {
-  if (val <= 9) return '0' + val;
-  else          return ('a'-10) + val;	
-}
-
-
-/**
- * print the given integer value as two hex-digits.
- */
-void vt100_xtoa( unsigned char val ) {
-  unsigned char c;
-  c = val >> 4;
-  vt100_putc( vt100_hex( c ));
-  c = val & 0x0f;
-  vt100_putc( vt100_hex( c ));
-}
-
-
-/** 
- * display the current game board position on the terminal.
- * This method redraws the whole gaming board including borders.
- * Use another call to display_block() to also draw the current block.
- */
-void display_board( void ) {
-  unsigned char r,c;
-  unsigned char ch;
-
-  vt100_cursor_home();
-  for( r=0; r < ROWS; r++ ) {
-
-    vt100_goto( r, 2 );
-
-    vt100_putc( '|' );            // one row of the board: border, data, border
-
-    for( c=0; c < COLS; c++ ) {
-      ch = occupied(r,c) ? 'X' : ' ';
-      vt100_putc( ch );
-    }
-    vt100_putc( '|' );
-    
-    // a real VT52 wants both linefeed (10) and carriage-return (13).
-    // We don't want a linefeed after the last row, because the terminal
-    // would scroll up then... anyway, we use vt100_goto() now.
-    // 
-    // vt100_putc( 13 );
-    // vt100_putc( 10 );
-  }
-}
 
 
 
@@ -789,80 +866,6 @@ void display_test_block( void ) {
   }
 }
 */
-
-
-/**
- * display (or erase) the current block at its current position,
- * depending on whether the paintMode parameter is PAINT_ACTIVE,
- * PAINT_FIXED, or ERASE.
- * This method just paints the active pixels from the block,
- * but nothing else (no game board, no borders, no score).
- * To achieve the best performance, we use the VT52 cursor
- * positioning commands via vt100_goto() for each of the
- * (always four) visible pixels of the block.
- */
-void display_block( unsigned char paintMode ) {
-  unsigned char i, j, ch;
-  unsigned char rr, cc;
-  
-  for( i=0; i < 4; i++ ) {
-  	rr = current_row + i;
-  	if (rr >= ROWS) continue; // out of range
-
-  	for ( j=0; j < 4; j++ ) {
-  	  cc = XOFFSET + current_col + j;
-      if (cc >= XLIMIT) continue; // out of range
-  		
-  	  if (getBlockPixel(i,j)) {
-        vt100_goto( rr, cc );
-        if     (paintMode == PAINT_ACTIVE) vt100_putc( 'H' );
-        else if (paintMode == PAINT_FIXED) vt100_putc( 'X' );
-        else                               vt100_putc( ' ' );  	  	
-  	  }	
-  	}
-  	
-  	// HACK:
-  	// extra goto because neither xterm/seycon nor Winxp hyperterm
-  	// understand the VT52 "cursor off" command, and the blinking
-  	// cursor at the end of a block is really annoying...
-  	// a "real" VT100/VT52 does work fine without this.
-  	vt100_goto( 1, 1 ); 
-  }
-} // display_block
-
-
-/**
- * display the current level and score values on the terminal.
- */
-void display_score( void ) {
-  vt100_goto( 20, 40 );
-/* uncommented to free some program memory for more important things...
-  vt100_putc( 'L' );
-  vt100_putc( 'e' );
-  vt100_putc( 'v' );
-  vt100_putc( 'e' );
-  vt100_putc( 'l' );
-  vt100_putc( ':' );
-  vt100_putc( ' ' );
-*/
-  vt100_xtoa( level );
-  
-  vt100_putc( ' ' );
-/*
-  vt100_goto( 21, 40 );
-  vt100_putc( 'S' );
-  vt100_putc( 'c' );
-  vt100_putc( 'o' );
-  vt100_putc( 'r' );
-  vt100_putc( 'e' );
-  vt100_putc( ':' );
-  vt100_putc( ' ' );
-*/
-  vt100_xtoa( (score>>8) );
-  vt100_xtoa( (score) );
-//vt100_putc( '\n' );
-
-}
 
 
 /*
