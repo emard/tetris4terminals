@@ -130,21 +130,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
+//#include <unistd.h>
 //#include <termios.h>
 //#include <string.h>
-//#include "tetris.h"
 typedef unsigned char bit;
-
-// NOTE: YOU MUST SELECT AND UNCOMMENT ONE OF THOSE MACROS.
-// Depending on the selected clock-rate of course - a 4 MHz clock
-// is a good choice for the actual real hardware, while 250 kHz
-// means that the Hades simulation will run near real-time.
-// For other input clock rates, change the RX/TX baudrate stuff
-// and the TMR0 and "divider"/"divider_limit" values to get an
-// acceptable game speed.
-//
-
 
 #define ROWS  ((unsigned char) 24)
 #define COLS  ((unsigned char) 10)
@@ -155,7 +144,6 @@ typedef unsigned char bit;
 
 #define XOFFSET ((unsigned char) 3)
 #define XLIMIT  ((unsigned char) (XOFFSET+COLS))
-
 
 
 static unsigned char board[30];         // the main game-board
@@ -213,9 +201,6 @@ static unsigned char  command;
 static unsigned char  divider;
 static unsigned char  divider_limit;
 static unsigned char  heartbeat;
-
-
-
 
 
 /**
@@ -531,6 +516,7 @@ void remove_row( unsigned char row ) {
   }
 }
 
+
 /**
  * initialize the 16F628 serial communication registers.
  * We also put some timer initialization here. 
@@ -842,10 +828,6 @@ void cmd_move_down( void ) {
 }
 
 
-
-
-
-
 /**
  * debugging display of the current block outside the gaming-board
  * area. 
@@ -876,7 +858,6 @@ void wait( void ) {
 */
 
 
-
 void init_game( void ) {
   vt100_enter_vt52_mode();
   clear_board();
@@ -900,6 +881,7 @@ void init_game( void ) {
 bit gameover( void ) {
   return (state & GAME_OVER) != 0;	
 }
+
 
 bit timeout( void ) {
   return (state & TIMEOUT) != 0;	
@@ -1002,7 +984,6 @@ void check_handle_command( void ) {
   	}
 }
 
-#if 1
 void isr( void ) {
     //command = getchar();
 
@@ -1012,7 +993,7 @@ void isr( void ) {
       state |= TIMEOUT;
     }
 }
-#endif
+
 
 void main(void)
 {
