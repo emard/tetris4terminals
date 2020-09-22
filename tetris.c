@@ -191,6 +191,7 @@ static unsigned char score;
 #define CMD_DROP     ((unsigned char) ' ')
 #define CMD_REDRAW   ((unsigned char) 'r')
 #define CMD_START    ((unsigned char) 's')
+#define CMD_QUIT     ((unsigned char) 'q')
 
 #define CMD_FASTER   ((unsigned char) 'f')
 #define CMD_SLOWER   ((unsigned char) 'd')
@@ -902,6 +903,9 @@ bit timeout( void ) {
 
 void check_handle_command( void ) {
   unsigned char tmp;
+  
+  if(command == CMD_QUIT)
+    exit(0);
   
   // if the game is over, we only react to the 's' restart command.
   // 
