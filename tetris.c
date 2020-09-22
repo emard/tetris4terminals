@@ -130,10 +130,16 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-//#include <unistd.h>
-//#include <termios.h>
-//#include <string.h>
 typedef unsigned char bit;
+
+
+#define NONBLOCKING 1
+#if NONBLOCKING
+#include <unistd.h>
+#include <termios.h>
+#include <string.h>
+struct termios orig_termios;
+#endif
 
 #define ROWS  ((unsigned char) 24)
 #define COLS  ((unsigned char) 10)
@@ -516,23 +522,29 @@ void remove_row( unsigned char row ) {
   }
 }
 
+#if NONBLOCKING
+void reset_terminal_mode()
+{
+    tcsetattr(0, TCSANOW, &orig_termios);
+}
+#endif
 
 /**
  * initialize the 16F628 serial communication registers.
  * We also put some timer initialization here. 
  */
 void vt100_initialize( void ) {
-#if 0
-  struct termios orig_termios, new_termios;
+#if NONBLOCKING
+    struct termios new_termios;
 
-  /* take two copies - one for now, one for later */
-  tcgetattr(0, &orig_termios);
-  memcpy(&new_termios, &orig_termios, sizeof(new_termios));
+    /* take two copies - one for now, one for later */
+    tcgetattr(0, &orig_termios);
+    memcpy(&new_termios, &orig_termios, sizeof(new_termios));
 
     /* register cleanup handler, and set the new terminal mode */
-
-  cfmakeraw(&new_termios);
-  tcsetattr(0, TCSANOW, &new_termios);
+    atexit(reset_terminal_mode);
+    cfmakeraw(&new_termios);
+    tcsetattr(0, TCSANOW, &new_termios);
 #endif
 }
 
@@ -984,14 +996,31 @@ void check_handle_command( void ) {
   	}
 }
 
-void isr( void ) {
-    //command = getchar();
+int kbhit()
+{
+    struct timeval tv = { 1L, 0L };
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(0, &fds);
+    return select(1, &fds, NULL, NULL, &tv);
+}
 
-    divider++;
-    if (divider >= divider_limit) {
-      divider = 0;
+void isr( void ) {
+#if NONBLOCKING
+    if(kbhit())
+    {
+      command=getchar();
+    }
+    else
+    {
       state |= TIMEOUT;
     }
+    fflush(stdout);
+#else
+    command = 0;
+    sleep(1);
+    state |= TIMEOUT;
+#endif
 }
 
 
