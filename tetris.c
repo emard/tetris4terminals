@@ -638,6 +638,16 @@ void vt100_cursor_home( void ) {
 }
 
 
+/** clear screen
+ */
+void vt100_clear_screen(void)
+{
+  vt100_cursor_home();
+  vt100_putc(27);
+  vt100_putc('J');  // clear to end of screen
+}
+
+
 /**
  * helper function to convert a hex-digit into a character 0..9 a..f
  */
@@ -900,6 +910,7 @@ void display_test_block( void ) {
 
 void init_game( void ) {
   vt100_enter_vt52_mode();
+  vt100_clear_screen();
   clear_board();
   display_board();
 
