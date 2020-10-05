@@ -21,7 +21,8 @@
  * 'l'        - move current block right
  * 'space'    - drop current block               
  * 'r'        - redraw the screen
- * 'q'        - quit (give up current game)
+ * 's'        - start new game (or give up current game)
+ * 'q'        - quit
  * 'f'        - faster
  * 'd'        - slower
  * 
@@ -133,13 +134,51 @@
 typedef unsigned char bit;
 
 
-#define NONBLOCKING 1
-#if NONBLOCKING
+// input mode
+#define SELECT 0
+#define BIOS 1
+#define NONE 0
+
+#if SELECT
 #include <unistd.h>
 #include <termios.h>
 #include <string.h>
 struct termios orig_termios;
-#endif
+#endif // SELECT
+
+#if BIOS
+#include <stdio.h>
+#include <unistd.h>
+#include <errno.h>
+
+#define FIONBIO      0x5421
+
+#define TCGETS           0x5401
+#define TCSETS           0x5402
+
+#define ECHO             0000010
+#define ICANON           0000002
+
+typedef unsigned char    cc_t;
+typedef unsigned int     speed_t;
+typedef unsigned int     tcflag_t;
+
+#define NCCS             32
+
+struct termios {
+    tcflag_t c_iflag;                /* input mode flags */
+    tcflag_t c_oflag;                /* output mode flags */
+    tcflag_t c_cflag;                /* control mode flags */
+    tcflag_t c_lflag;                /* local mode flags */
+    cc_t c_line;                     /* line discipline */
+    cc_t c_cc[NCCS];                 /* control characters */
+    speed_t c_ispeed;                /* input speed */
+    speed_t c_ospeed;                /* output speed */
+#define _HAVE_STRUCT_TERMIOS_C_ISPEED 1
+#define _HAVE_STRUCT_TERMIOS_C_OSPEED 1
+  };
+  struct termios orig_termios;
+#endif // BIOS
 
 #define ROWS  ((unsigned char) 24)
 #define COLS  ((unsigned char) 10)
@@ -523,32 +562,6 @@ void remove_row( unsigned char row ) {
   }
 }
 
-#if NONBLOCKING
-void reset_terminal_mode()
-{
-    tcsetattr(0, TCSANOW, &orig_termios);
-}
-#endif
-
-/**
- * initialize the 16F628 serial communication registers.
- * We also put some timer initialization here. 
- */
-void vt100_initialize( void ) {
-#if NONBLOCKING
-    struct termios new_termios;
-
-    /* take two copies - one for now, one for later */
-    tcgetattr(0, &orig_termios);
-    memcpy(&new_termios, &orig_termios, sizeof(new_termios));
-
-    /* register cleanup handler, and set the new terminal mode */
-    atexit(reset_terminal_mode);
-    cfmakeraw(&new_termios);
-    tcsetattr(0, TCSANOW, &new_termios);
-#endif
-}
-
 
 /** 
  * transmit the given character via tx to the terminal.
@@ -582,6 +595,65 @@ void vt100_enter_vt52_mode() {
   // VT52: cursor off
   vt100_putc( 27 );
   vt100_putc( 'f' );
+}
+
+void vt100_exit_vt52_mode( void ) {
+  vt100_putc( 27 );
+  vt100_putc( '<' );
+}
+
+void reset_terminal_mode()
+{
+  int r;
+  vt100_exit_vt52_mode();
+#if SELECT
+    tcsetattr(0, TCSANOW, &orig_termios);
+#endif
+#if BIOS
+  r = ioctl(0, TCSETS, &orig_termios);
+#endif
+}
+
+/**
+ * initialize the serial communication parameters.
+ * We also put some timer initialization here. 
+ */
+void vt100_initialize( void ) {
+#if SELECT
+  struct termios new_termios;
+
+  /* take two copies - one for now, one for later */
+  tcgetattr(0, &orig_termios);
+  memcpy(&new_termios, &orig_termios, sizeof(new_termios));
+
+  /* register cleanup handler, and set the new terminal mode */
+  atexit(reset_terminal_mode);
+  cfmakeraw(&new_termios);
+  tcsetattr(0, TCSANOW, &new_termios);
+#endif
+#if BIOS
+  int r;
+  //int mode;
+  char buf[2];
+  struct termios raw;
+
+  buf[1] = 0;
+
+  r = ioctl(0, TCGETS, &orig_termios);
+  raw = orig_termios;
+
+  raw.c_lflag &= ~(ECHO | ICANON);
+
+  #define VTIME 5
+  #define VMIN 6
+  raw.c_cc[VMIN] = 0;
+  raw.c_cc[VTIME] = 4; // *0.1s timeout
+
+  r = ioctl(0, TCSETS, &raw);
+
+  //mode = 1;
+  //r = ioctl(0, FIONBIO, &mode);
+#endif
 }
 
 
@@ -1000,6 +1072,7 @@ void check_handle_command( void ) {
   	}
 }
 
+#if SELECT
 int kbhit()
 {
     struct timeval tv = { 1L, 0L };
@@ -1008,22 +1081,41 @@ int kbhit()
     FD_SET(0, &fds);
     return select(1, &fds, NULL, NULL, &tv);
 }
+#endif
 
 void isr( void ) {
-#if NONBLOCKING
-    if(kbhit())
-    {
-      command=getchar();
-    }
-    else
-    {
-      state |= TIMEOUT;
-    }
-    fflush(stdout);
-#else
-    command = 0;
-    sleep(1);
+#if SELECT
+  if(kbhit())
+  {
+    command=getchar();
+  }
+  else
+  {
     state |= TIMEOUT;
+  }
+  fflush(stdout);
+#endif
+#if BIOS
+  int tim[3];
+  int r;
+  int mode;
+  char buf[2];
+  r = read(0, buf, 1);
+  if (r > 0)
+  {
+    command = buf[0];
+  } 
+  else
+  { 
+    command = 0;
+    state |= TIMEOUT;
+  }
+  fflush(stdout);
+#endif
+#if NONE
+  command = 0;
+  sleep(1);
+  state |= TIMEOUT;
 #endif
 }
 
