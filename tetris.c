@@ -1,4 +1,4 @@
-/* PIC16F628 Tetris for Terminals (2nd version)
+/* Tetris for Terminals (2nd version) on saxonsoc linux
  * 
  * This program implements a (simplified) version of the famous 'Tetris'
  * game with a PIC16F628 connected to a serial terminal (VT52 or higher).
