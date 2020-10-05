@@ -199,7 +199,7 @@ static signed char current_col;         // col of the current block
 
 static unsigned char lines;
 static unsigned char level;
-static unsigned char score;
+static unsigned int  score;
 
 #define STATE_IDLE   ((unsigned char) 0x1)
 #define TIMEOUT      ((unsigned char) 0x2)
@@ -605,13 +605,14 @@ void vt100_initialize( void ) {
   r = ioctl(0, TCGETS, &orig_termios);
   current_termios = orig_termios;
 
-  current_termios.c_lflag &= ~(ECHO | ICANON /* | ISIG */);
+  current_termios.c_lflag &= ~(ECHO | ICANON | ISIG);
 
   current_termios.c_cc[VMIN] = 0;
   current_termios.c_cc[VTIME] = 4; // *0.1s timeout
 
   r = ioctl(0, TCSETS, &current_termios);
 
+  atexit(reset_terminal_mode);
 }
 
 
@@ -662,9 +663,9 @@ unsigned char vt100_hex( unsigned char val ) {
  */
 void vt100_xtoa( unsigned char val ) {
   unsigned char c;
-  c = val >> 4;
+  c = (val / 10) & 0x0f;
   vt100_putc( vt100_hex( c ));
-  c = val & 0x0f;
+  c = (val % 10);
   vt100_putc( vt100_hex( c ));
 }
 
@@ -706,7 +707,7 @@ void display_block( unsigned char paintMode ) {
     // understand the VT52 "cursor off" command, and the blinking
     // cursor at the end of a block is really annoying...
     // a "real" VT100/VT52 does work fine without this.
-    vt100_goto( 1, 1 ); 
+    vt100_goto( 24, 0 ); 
   }
 } // display_block
 
@@ -751,7 +752,7 @@ void display_board( void ) {
  */
 void display_score( void ) {
   vt100_goto( 20, 40 );
-/* uncommented to free some program memory for more important things...
+#if 1
   vt100_putc( 'L' );
   vt100_putc( 'e' );
   vt100_putc( 'v' );
@@ -759,11 +760,11 @@ void display_score( void ) {
   vt100_putc( 'l' );
   vt100_putc( ':' );
   vt100_putc( ' ' );
-*/
+#endif
   vt100_xtoa( level );
-  
+
   vt100_putc( ' ' );
-/*
+#if 1
   vt100_goto( 21, 40 );
   vt100_putc( 'S' );
   vt100_putc( 'c' );
@@ -772,11 +773,10 @@ void display_score( void ) {
   vt100_putc( 'e' );
   vt100_putc( ':' );
   vt100_putc( ' ' );
-*/
-  vt100_xtoa( (score>>8) );
-  vt100_xtoa( (score) );
-//vt100_putc( '\n' );
-
+#endif
+  vt100_xtoa( (score/100) );
+  vt100_xtoa( (score%100) );
+  vt100_putc( '\n' );
 }
 
 
