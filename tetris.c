@@ -672,11 +672,11 @@ void display_block( unsigned char paintMode ) {
       if (cc >= XLIMIT) continue; // out of range
   		
   	  if (getBlockPixel(i,j)) {
-        vt100_goto( rr, cc );
-        if     (paintMode == PAINT_ACTIVE) vt100_putc( 'H' );
-        else if (paintMode == PAINT_FIXED) vt100_putc( 'X' );
-        else                               vt100_putc( ' ' );  	  	
-  	  }	
+        vt100_goto( rr, cc*2 );
+        if     (paintMode == PAINT_ACTIVE) {vt100_putc( 'H' );vt100_putc( 'H' );}
+        else if (paintMode == PAINT_FIXED) {vt100_putc( 'X' );vt100_putc( 'X' );}
+        else                               {vt100_putc( ' ' );vt100_putc( ' ' );}  	  	
+  	  }
   	}
   	
   	// HACK:
@@ -701,14 +701,17 @@ void display_board( void ) {
   vt100_cursor_home();
   for( r=0; r < ROWS; r++ ) {
 
-    vt100_goto( r, 2 );
+    vt100_goto( r, 2*2 );
 
+    vt100_putc( '|' );            // one row of the board: border, data, border
     vt100_putc( '|' );            // one row of the board: border, data, border
 
     for( c=0; c < COLS; c++ ) {
       ch = occupied(r,c) ? 'X' : ' ';
       vt100_putc( ch );
+      vt100_putc( ch );
     }
+    vt100_putc( '|' );
     vt100_putc( '|' );
     
     // a real VT52 wants both linefeed (10) and carriage-return (13).
