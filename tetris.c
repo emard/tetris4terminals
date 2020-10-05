@@ -158,6 +158,7 @@ struct termios orig_termios;
 
 #define ECHO             0000010
 #define ICANON           0000002
+#define ISIG             0000001
 
 typedef unsigned char    cc_t;
 typedef unsigned int     speed_t;
@@ -201,6 +202,7 @@ static unsigned char current_block3;    // variables
 static signed char current_row;         // row of the current block
 static signed char current_col;         // col of the current block
 
+static unsigned char lines;
 static unsigned char level;
 static unsigned char score;
 
@@ -243,10 +245,6 @@ static unsigned char score;
 
 static unsigned char  state;
 static unsigned char  command;
-
-static unsigned char  divider;
-static unsigned char  divider_limit;
-static unsigned char  heartbeat;
 
 
 /**
@@ -642,7 +640,7 @@ void vt100_initialize( void ) {
   r = ioctl(0, TCGETS, &orig_termios);
   raw = orig_termios;
 
-  raw.c_lflag &= ~(ECHO | ICANON);
+  raw.c_lflag &= ~(ECHO | ICANON /* | ISIG */);
 
   #define VTIME 5
   #define VMIN 6
@@ -818,7 +816,14 @@ void check_remove_completed_rows( void ) {
   	if (is_complete_row(r)) {
   	  flag = 1;
   	  remove_row( r );
-  	  level++;
+          if(++lines == 10)
+          {
+            lines = 0;
+            if(level < 10)
+            {
+              level++;
+            }
+          }
   	}
   }
   
@@ -904,7 +909,6 @@ void cmd_move_down( void ) {
 
   current_row = 0;
   current_col = 4;
-  level ++;
   
   create_random_block();
   score += SCORE_PER_BLOCK;
@@ -952,11 +956,9 @@ void init_game( void ) {
   current_col = 4;
   create_random_block();
   score = SCORE_PER_BLOCK;  // one block created right now
+  lines = 0;
   level = 0;
   
-  divider = 0;
-  //divider_limit = 10;
-
   state = STATE_IDLE;
   command = CMD_NONE;
   display_block( PAINT_ACTIVE );
@@ -1056,15 +1058,6 @@ void check_handle_command( void ) {
   	case CMD_START: // quit and (re-) start the game
   	            init_game();
   	            break;
-  	            
-    case CMD_FASTER: // lower the divider_limit value
-                divider_limit --;
-                if (divider_limit < 1) divider_limit = 1;
-                break;
-                
-    case CMD_SLOWER: // increase the divider_limit value
-                divider_limit ++;
-                break;                  	           
   	            
     default:
   	            // do nothing
