@@ -143,7 +143,7 @@ typedef unsigned char bit;
 #include <unistd.h>
 #include <termios.h>
 #include <string.h>
-struct termios orig_termios;
+struct termios orig_termios, current_termios;
 #endif // SELECT
 
 #if BIOS
@@ -178,7 +178,7 @@ struct termios {
 #define _HAVE_STRUCT_TERMIOS_C_ISPEED 1
 #define _HAVE_STRUCT_TERMIOS_C_OSPEED 1
   };
-  struct termios orig_termios;
+  struct termios orig_termios, current_termios;
 #endif // BIOS
 
 #define ROWS  ((unsigned char) 24)
@@ -612,6 +612,15 @@ void reset_terminal_mode()
 #endif
 }
 
+#define VTIME 5
+#define VMIN 6
+
+void level_speed(unsigned char level)
+{
+  current_termios.c_cc[VTIME] = level < 10 ? 10-level : 1; // *0.1s timeout
+  ioctl(0, TCSETS, &current_termios);
+}
+
 /**
  * initialize the serial communication parameters.
  * We also put some timer initialization here. 
@@ -633,24 +642,19 @@ void vt100_initialize( void ) {
   int r;
   //int mode;
   char buf[2];
-  struct termios raw;
 
   buf[1] = 0;
 
   r = ioctl(0, TCGETS, &orig_termios);
-  raw = orig_termios;
+  current_termios = orig_termios;
 
-  raw.c_lflag &= ~(ECHO | ICANON /* | ISIG */);
+  current_termios.c_lflag &= ~(ECHO | ICANON /* | ISIG */);
 
-  #define VTIME 5
-  #define VMIN 6
-  raw.c_cc[VMIN] = 0;
-  raw.c_cc[VTIME] = 4; // *0.1s timeout
+  current_termios.c_cc[VMIN] = 0;
+  current_termios.c_cc[VTIME] = 4; // *0.1s timeout
 
-  r = ioctl(0, TCSETS, &raw);
+  r = ioctl(0, TCSETS, &current_termios);
 
-  //mode = 1;
-  //r = ioctl(0, FIONBIO, &mode);
 #endif
 }
 
@@ -819,10 +823,8 @@ void check_remove_completed_rows( void ) {
           if(++lines == 10)
           {
             lines = 0;
-            if(level < 10)
-            {
-              level++;
-            }
+            if(level < 9)
+              level_speed(++level);
           }
   	}
   }
@@ -958,6 +960,7 @@ void init_game( void ) {
   score = SCORE_PER_BLOCK;  // one block created right now
   lines = 0;
   level = 0;
+  level_speed(level);
   
   state = STATE_IDLE;
   command = CMD_NONE;
