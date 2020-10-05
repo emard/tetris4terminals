@@ -134,7 +134,17 @@
 #include <unistd.h>
 #include <errno.h>
 
-typedef unsigned char bit;
+// graphics
+
+#define CHAR_SPACE  ' '
+#define CHAR_WALL   '|'
+#define CHAR_ACTIVE 'H'
+#define CHAR_FIXED  'X'
+
+// 1-single char, 2-double char, ...
+#define DRAW_MULTI  2
+
+typedef unsigned char bit; // compatiblity
 
 #define TCGETS           0x5401
 #define TCSETS           0x5402
@@ -660,31 +670,33 @@ void vt100_xtoa( unsigned char val ) {
  * (always four) visible pixels of the block.
  */
 void display_block( unsigned char paintMode ) {
-  unsigned char i, j, ch;
+  unsigned char i, j, k, ch;
   unsigned char rr, cc;
+  char draw;
   
   for( i=0; i < 4; i++ ) {
-  	rr = current_row + i;
-  	if (rr >= ROWS) continue; // out of range
+    rr = current_row + i;
+    if (rr >= ROWS) continue; // out of range
 
-  	for ( j=0; j < 4; j++ ) {
-  	  cc = XOFFSET + current_col + j;
+    for ( j=0; j < 4; j++ ) {
+      cc = XOFFSET + current_col + j;
       if (cc >= XLIMIT) continue; // out of range
-  		
-  	  if (getBlockPixel(i,j)) {
-        vt100_goto( rr, cc*2 );
-        if     (paintMode == PAINT_ACTIVE) {vt100_putc( 'H' );vt100_putc( 'H' );}
-        else if (paintMode == PAINT_FIXED) {vt100_putc( 'X' );vt100_putc( 'X' );}
-        else                               {vt100_putc( ' ' );vt100_putc( ' ' );}  	  	
-  	  }
-  	}
+      if (getBlockPixel(i,j)) {
+        vt100_goto( rr, cc*DRAW_MULTI );
+        if     (paintMode == PAINT_ACTIVE) draw = CHAR_ACTIVE;
+        else if (paintMode == PAINT_FIXED) draw = CHAR_FIXED;
+        else                               draw = CHAR_SPACE;
+        for(k = 0; k < DRAW_MULTI; k++)
+          vt100_putc(draw);
+      }
+    }
   	
-  	// HACK:
-  	// extra goto because neither xterm/seycon nor Winxp hyperterm
-  	// understand the VT52 "cursor off" command, and the blinking
-  	// cursor at the end of a block is really annoying...
-  	// a "real" VT100/VT52 does work fine without this.
-  	vt100_goto( 1, 1 ); 
+    // HACK:
+    // extra goto because neither xterm/seycon nor Winxp hyperterm
+    // understand the VT52 "cursor off" command, and the blinking
+    // cursor at the end of a block is really annoying...
+    // a "real" VT100/VT52 does work fine without this.
+    vt100_goto( 1, 1 ); 
   }
 } // display_block
 
@@ -695,24 +707,24 @@ void display_block( unsigned char paintMode ) {
  * Use another call to display_block() to also draw the current block.
  */
 void display_board( void ) {
-  unsigned char r,c;
+  unsigned char r,c,k;
   unsigned char ch;
 
   vt100_cursor_home();
   for( r=0; r < ROWS; r++ ) {
 
-    vt100_goto( r, 2*2 );
+    vt100_goto( r, 2*DRAW_MULTI );
 
-    vt100_putc( '|' );            // one row of the board: border, data, border
-    vt100_putc( '|' );            // one row of the board: border, data, border
+    for(k = 0; k < DRAW_MULTI; k++)
+      vt100_putc( CHAR_WALL );            // one row of the board: border, data, border
 
     for( c=0; c < COLS; c++ ) {
-      ch = occupied(r,c) ? 'X' : ' ';
-      vt100_putc( ch );
-      vt100_putc( ch );
+      ch = occupied(r,c) ? CHAR_FIXED : CHAR_SPACE;
+      for(k = 0; k < DRAW_MULTI; k++)
+        vt100_putc( ch );
     }
-    vt100_putc( '|' );
-    vt100_putc( '|' );
+    for(k = 0; k < DRAW_MULTI; k++)
+      vt100_putc( CHAR_WALL );
     
     // a real VT52 wants both linefeed (10) and carriage-return (13).
     // We don't want a linefeed after the last row, because the terminal
