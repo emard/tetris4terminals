@@ -119,6 +119,7 @@
  * 
  * (C) 2005, 2006 fnh hendrich@informatik.uni-hamburg.de
  * 
+ * 2020.10.05 - lcc compiled for saxonsoc
  * 2006.03.23 - change vt100_putc to support 4MHz and 250 kHz clock
  * 2006.03.20 - ifdef stuff to change between 4 MHz and 250 kHz clock
  * 2006.03.06 - change 16F628 to use XT osc. mode at 4.000 MHz
@@ -128,30 +129,12 @@
  * 2005.12.27 - first code (game board drawing etc)
  */
 
-
 #include <stdio.h>
 #include <stdlib.h>
-typedef unsigned char bit;
-
-
-// input mode
-#define SELECT 0
-#define BIOS 1
-#define NONE 0
-
-#if SELECT
-#include <unistd.h>
-#include <termios.h>
-#include <string.h>
-struct termios orig_termios, current_termios;
-#endif // SELECT
-
-#if BIOS
-#include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
 
-#define FIONBIO      0x5421
+typedef unsigned char bit;
 
 #define TCGETS           0x5401
 #define TCSETS           0x5402
@@ -160,13 +143,17 @@ struct termios orig_termios, current_termios;
 #define ICANON           0000002
 #define ISIG             0000001
 
+#define VTIME 5
+#define VMIN 6
+
 typedef unsigned char    cc_t;
 typedef unsigned int     speed_t;
 typedef unsigned int     tcflag_t;
 
 #define NCCS             32
 
-struct termios {
+struct termios
+{
     tcflag_t c_iflag;                /* input mode flags */
     tcflag_t c_oflag;                /* output mode flags */
     tcflag_t c_cflag;                /* control mode flags */
@@ -177,9 +164,8 @@ struct termios {
     speed_t c_ospeed;                /* output speed */
 #define _HAVE_STRUCT_TERMIOS_C_ISPEED 1
 #define _HAVE_STRUCT_TERMIOS_C_OSPEED 1
-  };
-  struct termios orig_termios, current_termios;
-#endif // BIOS
+};
+struct termios orig_termios, current_termios;
 
 #define ROWS  ((unsigned char) 24)
 #define COLS  ((unsigned char) 10)
@@ -190,7 +176,6 @@ struct termios {
 
 #define XOFFSET ((unsigned char) 3)
 #define XLIMIT  ((unsigned char) (XOFFSET+COLS))
-
 
 static unsigned char board[30];         // the main game-board
 
@@ -206,24 +191,10 @@ static unsigned char lines;
 static unsigned char level;
 static unsigned char score;
 
-// the possible user commands encoded as one-byte constants
-//
-/*
-#define CMD_LEFT     ((unsigned char) 0x01)
-#define CMD_RIGHT    ((unsigned char) 0x02)
-#define CMD_ROTATE   ((unsigned char) 0x04)
-#define CMD_DROP     ((unsigned char) 0x08)
-#define CMD_REDRAW   ((unsigned char) 0x10)
-
-#define GAME_OVER    ((unsigned char) 0x40)
-#define NEEDS_INIT   ((unsigned char) 0x80)
-*/
-
 #define STATE_IDLE   ((unsigned char) 0x1)
 #define TIMEOUT      ((unsigned char) 0x2)
 #define NEEDS_INIT   ((unsigned char) 0x4) 
 #define GAME_OVER    ((unsigned char) 0x8) 
-
 
 #define CMD_NONE     ((unsigned char) 0)
 #define CMD_LEFT     ((unsigned char) 'j')
@@ -234,18 +205,12 @@ static unsigned char score;
 #define CMD_START    ((unsigned char) 's')
 #define CMD_QUIT     ((unsigned char) 'q')
 
-#define CMD_FASTER   ((unsigned char) 'f')
-#define CMD_SLOWER   ((unsigned char) 'd')
-
 // high-scores: 1 point per new block, 20 points per completed row
 #define SCORE_PER_BLOCK  ((unsigned char) 1)
 #define SCORE_PER_ROW    ((unsigned char) 20)
 
-
-
 static unsigned char  state;
 static unsigned char  command;
-
 
 /**
  * utility function to calculate (1 << nbits)
@@ -381,7 +346,6 @@ void updateBlockNibble( unsigned char i, unsigned char mask ) {
  * (- - - -   i j k l)   =>      (i j k l   b f j n)
  * (- - - -   m n o p)           (m n o p   a e i m)
  * 
-
 
  */ 
 void rotate_block( void ) {
@@ -595,25 +559,20 @@ void vt100_enter_vt52_mode() {
   vt100_putc( 'f' );
 }
 
+
 void vt100_exit_vt52_mode( void ) {
   vt100_putc( 27 );
   vt100_putc( '<' );
 }
 
+
 void reset_terminal_mode()
 {
   int r;
   vt100_exit_vt52_mode();
-#if SELECT
-    tcsetattr(0, TCSANOW, &orig_termios);
-#endif
-#if BIOS
   r = ioctl(0, TCSETS, &orig_termios);
-#endif
 }
 
-#define VTIME 5
-#define VMIN 6
 
 void level_speed(unsigned char level)
 {
@@ -621,24 +580,12 @@ void level_speed(unsigned char level)
   ioctl(0, TCSETS, &current_termios);
 }
 
+
 /**
  * initialize the serial communication parameters.
  * We also put some timer initialization here. 
  */
 void vt100_initialize( void ) {
-#if SELECT
-  struct termios new_termios;
-
-  /* take two copies - one for now, one for later */
-  tcgetattr(0, &orig_termios);
-  memcpy(&new_termios, &orig_termios, sizeof(new_termios));
-
-  /* register cleanup handler, and set the new terminal mode */
-  atexit(reset_terminal_mode);
-  cfmakeraw(&new_termios);
-  tcsetattr(0, TCSANOW, &new_termios);
-#endif
-#if BIOS
   int r;
   //int mode;
   char buf[2];
@@ -655,7 +602,6 @@ void vt100_initialize( void ) {
 
   r = ioctl(0, TCSETS, &current_termios);
 
-#endif
 }
 
 
@@ -820,7 +766,7 @@ void check_remove_completed_rows( void ) {
   	if (is_complete_row(r)) {
   	  flag = 1;
   	  remove_row( r );
-          if(++lines == 10)
+          if(++lines == 3)
           {
             lines = 0;
             if(level < 9)
@@ -937,18 +883,6 @@ void display_test_block( void ) {
 */
 
 
-/*
-void wait( void ) {
-  unsigned char count;
-  
-  for( count=0; count < 250; count++ ) {
-    RB5 = 1;
-  	RB5 = 0;	
-  }
-}
-*/
-
-
 void init_game( void ) {
   vt100_enter_vt52_mode();
   clear_board();
@@ -959,7 +893,7 @@ void init_game( void ) {
   create_random_block();
   score = SCORE_PER_BLOCK;  // one block created right now
   lines = 0;
-  level = 0;
+  level = 1;
   level_speed(level);
   
   state = STATE_IDLE;
@@ -1068,30 +1002,7 @@ void check_handle_command( void ) {
   	}
 }
 
-#if SELECT
-int kbhit()
-{
-    struct timeval tv = { 1L, 0L };
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(0, &fds);
-    return select(1, &fds, NULL, NULL, &tv);
-}
-#endif
-
 void isr( void ) {
-#if SELECT
-  if(kbhit())
-  {
-    command=getchar();
-  }
-  else
-  {
-    state |= TIMEOUT;
-  }
-  fflush(stdout);
-#endif
-#if BIOS
   int tim[3];
   int r;
   int mode;
@@ -1107,12 +1018,6 @@ void isr( void ) {
     state |= TIMEOUT;
   }
   fflush(stdout);
-#endif
-#if NONE
-  command = 0;
-  sleep(1);
-  state |= TIMEOUT;
-#endif
 }
 
 
@@ -1122,7 +1027,6 @@ void main(void)
   init_game();              // initialize the game-board and stuff
 
   for( ;; ) {
-        //usleep(100000);
   	check_handle_command();
   	isr();
   }
