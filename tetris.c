@@ -17,7 +17,8 @@
  * Use the following keys to control the game:
  * 
  * 'j'        - move current block left
- * 'k'        - rotate current block
+ * 'k'        - rotate current block counter-clockwise
+ * 'i'        - rotate current block clockwise
  * 'l'        - move current block right
  * 'space'    - drop current block               
  * 'r'        - redraw the screen
@@ -218,7 +219,8 @@ static unsigned int  score;
 #define CMD_NONE     ((unsigned char) 0)
 #define CMD_LEFT     ((unsigned char) 'j')
 #define CMD_RIGHT    ((unsigned char) 'l')
-#define CMD_ROTATE   ((unsigned char) 'k')
+#define CMD_ROTATE_CCW ((unsigned char) 'k')
+#define CMD_ROTATE_CW  ((unsigned char) 'i')
 #define CMD_DROP     ((unsigned char) ' ')
 #define CMD_REDRAW   ((unsigned char) 'r')
 #define CMD_START    ((unsigned char) 's')
@@ -439,8 +441,8 @@ void create_random_block( void ) {
 }
 
 
-void rotate_block( void ) {
-  current_rotation = (current_rotation+1)&3;
+void rotate_block( char r ) {
+  current_rotation = (current_rotation+r)&3;
   create_rotated_block(current_index, current_rotation);
 }
 
@@ -1061,15 +1063,13 @@ void cmd_move_right( void ) {
  * This function updates the current_block(0..3) variables, 
  * but does not repaint the current block.
  */
-void cmd_rotate( void ) {
-  rotate_block();
+void cmd_rotate( char r ) {
+  rotate_block(r);
   if (test_if_block_fits()) return;
   
   // if we arrive here, the block doesn't fit,
   // and we undo the rotation by three more rotations...
-  rotate_block();
-  rotate_block();
-  rotate_block();	
+  rotate_block(-r);
 }
 
 
@@ -1205,9 +1205,15 @@ void check_handle_command( void ) {
   	            display_block( PAINT_ACTIVE );
   	            break;
 
-  	case CMD_ROTATE: // try to rotate the current block
+  	case CMD_ROTATE_CCW: // try to rotate the current block
   	            display_block( ERASE );
-  	            cmd_rotate();
+  	            cmd_rotate(1);
+  	            display_block( PAINT_ACTIVE );
+  	            break;
+
+  	case CMD_ROTATE_CW: // try to rotate the current block
+  	            display_block( ERASE );
+  	            cmd_rotate(-1);
   	            display_block( PAINT_ACTIVE );
   	            break;
 
