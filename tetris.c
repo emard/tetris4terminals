@@ -593,7 +593,7 @@ void vt100_default_color()
   vt100_putc( 'm' );
 }
 
-void vt100_full_screen()
+void vt100_default_scroll_region()
 {
   vt100_putc( 27 );
   vt100_putc( '[' );
@@ -602,7 +602,11 @@ void vt100_full_screen()
   vt100_putc( '2' );
   vt100_putc( '4' );
   vt100_putc( 'r' );
+}
 
+void vt100_full_screen()
+{
+  vt100_default_scroll_region();
   // cursor down
   vt100_putc( 27 );
   vt100_putc( '[' );
@@ -768,7 +772,7 @@ void vt100_bgcolor(unsigned char color)
 #if VT100_SCROLL
 void vt100_scroll_region_down(unsigned char b)
 {
-  vt100_cursor_home(); // to top of regin
+  vt100_cursor_home(); // to top of region
 
   vt100_putc(27);    // ESC
   vt100_putc('[');
@@ -777,22 +781,10 @@ void vt100_scroll_region_down(unsigned char b)
   vt100_itoa(b+1);
   vt100_putc( 'r' );  // set region
 
-  vt100_putc(27);    // turn on region, origin mode
-  vt100_putc('[');
-  vt100_putc('?');
-  vt100_putc('6');
-  vt100_putc('h');
-
-  vt100_cursor_home(); // to top of regin
-
   vt100_putc(27);
   vt100_putc('M');   // at top of region, scroll down
 
-  vt100_putc(27);    // turn off region
-  vt100_putc('[');
-  vt100_putc('?');
-  vt100_putc('6');
-  vt100_putc('l');
+  vt100_default_scroll_region();
 }
 #endif
 
@@ -852,7 +844,7 @@ void display_block( unsigned char paintMode ) {
     // understand the VT52 "cursor off" command, and the blinking
     // cursor at the end of a block is really annoying...
     // a "real" VT100/VT52 does work fine without this.
-    vt100_goto( 23, 0 );
+    vt100_cursor_home();
   }
 } // display_block
 
