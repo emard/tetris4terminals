@@ -462,6 +462,7 @@ void create_random_block( void ) {
   unsigned char x = 0;
   while(x == 0)
     x = rand() & 7;
+  // x is now random 1-7
   create_rotated_block(x,0);
   current_index = x;
   current_rotation = 0;
@@ -1156,6 +1157,10 @@ void display_test_block( void ) {
 void init_game( void ) {
 #if VT52
   vt100_enter_vt52_mode();
+#else
+#if VT100_COLOR
+  vt100_default_color();
+#endif
 #endif
   vt100_clear_screen();
   clear_board();
