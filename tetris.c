@@ -145,8 +145,10 @@
 #define DRAW_MULTI  2
 
 // switch VT100 to VT52 mode and use VT52 controls
+// 0: VT100 default
+// 1: VT100->VT52
 #define VT52 0
-
+#define VT100_COLOR 1
 
 typedef unsigned char bit; // compatiblity
 
@@ -193,6 +195,7 @@ struct termios orig_termios, current_termios;
 
 static unsigned char board[30];         // the main game-board
 
+static unsigned char current_index;     // index of the current block (for colorization)
 static unsigned char current_block0;    // bit-pattern of the current block,
 static unsigned char current_block1;    // with one four-bit bitmap stored
 static unsigned char current_block2;    // in the lower nibble of each of these
@@ -316,7 +319,8 @@ void create_block( unsigned char index ) {
 void create_random_block( void ) {
   unsigned char x;
   x = rand() & 0x7;
-  create_block( x );	
+  create_block( x );
+  current_index = x;
 }
 
 
@@ -579,12 +583,24 @@ void vt100_exit_vt52_mode( void ) {
   vt100_putc( '<' );
 }
 
+void vt100_default_color()
+{
+  vt100_putc( 27 );
+  vt100_putc( '[' );
+  vt100_putc( '4' );
+  vt100_putc( '9' );
+  vt100_putc( 'm' );
+}
 
 void reset_terminal_mode()
 {
   int r;
 #if VT52
   vt100_exit_vt52_mode();
+#else
+#if VT100_COLOR
+  vt100_default_color();
+#endif
 #endif
   r = ioctl(0, TCSETS, &orig_termios);
 }
@@ -700,6 +716,37 @@ void vt100_goto( unsigned char row, unsigned char col ) {
 #endif
 }
 
+void vt100_bgcolor(unsigned char color)
+{
+  vt100_putc(27);    // ESC
+  vt100_putc('[');
+  if(color >= 100)
+  {
+    vt100_putc('1');
+    color -= 100;
+  }
+  vt100_xtoa(color);
+  vt100_putc('m');  // set color
+}
+
+
+unsigned char index2color[] = {41,42,43,44,45,46,101,102,103,104,105,106};
+
+void block_color(unsigned char paintMode)
+{
+  #if VT52
+  #else
+  #if VT100_COLOR
+  unsigned char bgcolor;
+
+  bgcolor = 49; // default color (black)
+  bgcolor = paintMode == PAINT_ACTIVE || paintMode == PAINT_FIXED ? index2color[current_index] : 49;
+  vt100_bgcolor(bgcolor);
+  #endif
+  #endif
+}
+
+
 /**
  * display (or erase) the current block at its current position,
  * depending on whether the paintMode parameter is PAINT_ACTIVE,
@@ -714,7 +761,8 @@ void display_block( unsigned char paintMode ) {
   unsigned char i, j, k, ch;
   unsigned char rr, cc;
   char draw;
-  
+
+  block_color(paintMode);
   for( i=0; i < 4; i++ ) {
     rr = current_row + i;
     if (rr >= ROWS) continue; // out of range
@@ -832,6 +880,7 @@ void check_remove_completed_rows( void ) {
   
   if (flag) {
     vt100_beep();
+    block_color(ERASE);
     display_board();
     display_score();
   }
