@@ -191,8 +191,12 @@ struct termios
 };
 struct termios orig_termios, current_termios;
 
-#define ROWS  ((unsigned char) 24)
+#define ROWS  ((unsigned char) 32) // must be divisible by 8
 #define COLS  ((unsigned char) 10)
+
+#define ROWSD ((unsigned char) 24) // last N rows displayed
+#define ROW0  (ROWS-ROWSD) // first row displayed
+#define ROWNEW 7 // ROW in memory where new piece appears
 
 #define PAINT_FIXED  ((unsigned char) 2)
 #define PAINT_ACTIVE ((unsigned char) 1)
@@ -201,7 +205,9 @@ struct termios orig_termios, current_termios;
 #define XOFFSET ((unsigned char) 3)
 #define XLIMIT  ((unsigned char) (XOFFSET+COLS))
 
-static unsigned char board[30];         // the main game-board
+#define BOARD_BYTES ((ROWS>>3)*10)
+
+static unsigned char board[BOARD_BYTES];         // the main game-board
 
 static unsigned char current_index;     // index of the current block (for colorization)
 static unsigned char current_block0;    // bit-pattern of the current block,
@@ -927,13 +933,13 @@ void display_block( unsigned char paintMode ) {
   block_color(paintMode);
   for( i=0; i < 4; i++ ) {
     rr = current_row + i;
-    if (rr >= ROWS) continue; // out of range
+    if (rr < ROW0 || rr >= ROWS) continue; // out of range
 
     for ( j=0; j < 4; j++ ) {
       cc = XOFFSET + current_col + j;
       if (cc >= XLIMIT) continue; // out of range
       if (getBlockPixel(i,j)) {
-        vt100_goto( rr, cc*DRAW_MULTI );
+        vt100_goto( rr-ROW0, cc*DRAW_MULTI );
         if     (paintMode == PAINT_ACTIVE) draw = CHAR_ACTIVE;
         else if (paintMode == PAINT_FIXED) draw = CHAR_FIXED;
         else                               draw = CHAR_SPACE;
@@ -970,7 +976,7 @@ void display_board( unsigned char rows ) {
       vt100_putc( CHAR_WALL );            // one row of the board: border, data, border
 
     for( c=0; c < COLS; c++ ) {
-      ch = occupied(r,c) ? CHAR_FIXED : CHAR_SPACE;
+      ch = occupied(r+ROW0,c) ? CHAR_FIXED : CHAR_SPACE;
       for(k = 0; k < DRAW_MULTI; k++)
         vt100_putc( ch );
     }
@@ -1061,7 +1067,7 @@ void check_remove_completed_rows( void ) {
       #if VT52
       #else
       #if VT100_SCROLL
-      vt100_scroll_region_down(r);
+      vt100_scroll_region_down(r-ROW0);
       #endif
       #endif
       if(++lines == 3)
@@ -1082,7 +1088,7 @@ void check_remove_completed_rows( void ) {
     // redraw scrolled out walls on top
     display_board(removed);
     #else
-    display_board(ROWS);
+    display_board(ROWSD);
     #endif
     #if VT100_COLOR
     vt100_default_color();
@@ -1151,7 +1157,7 @@ void cmd_move_down( void ) {
   current_row++;
   if (test_if_block_fits()) return; // fits
   
-  if (current_row <= 2) { // already stuck right on top
+  if (current_row <= ROWNEW+2) { // already stuck right on top
   	state |= GAME_OVER;
   }
   
@@ -1164,7 +1170,7 @@ void cmd_move_down( void ) {
   copy_block_to_gameboard();
   check_remove_completed_rows(); // repaints all when necessary
 
-  current_row = 0;
+  current_row = ROWNEW;
   current_col = 4;
   
   create_random_block();
@@ -1202,9 +1208,9 @@ void init_game( void ) {
 #endif
   vt100_clear_screen();
   clear_board();
-  display_board(ROWS);
+  display_board(ROWSD);
 
-  current_row = 0;
+  current_row = ROWNEW;
   current_col = 4;
   create_random_block();
   score = SCORE_PER_BLOCK;  // one block created right now
@@ -1230,17 +1236,17 @@ bit timeout( void ) {
 
 void check_handle_command( void ) {
   unsigned char tmp;
-  
+
   if(command == CMD_QUIT || command == CMD_CTRLC || command == CMD_ESC)
     exit(0);
-  
+
   // if the game is over, we only react to the 's' restart command.
   // 
   if (gameover()) {
-  	if (command == CMD_START) {
+    if (command == CMD_START) {
   	  init_game();	
-  	}
-  	return;
+    }
+    return;
   }
 	
   // first check game status and a possible timeout. 
@@ -1260,38 +1266,37 @@ void check_handle_command( void ) {
   //  
   tmp = command;
   command = CMD_NONE;
-  
+
   switch( tmp ) {
-  	
-    case CMD_NONE: // idle
-    
-                break;
 
-  	case CMD_LEFT: // try to move the current block left
-  	            display_block( ERASE );
-  	            cmd_move_left();
-  	            display_block( PAINT_ACTIVE );
+        case CMD_NONE: // idle
+                    break;
+
+        case CMD_LEFT: // try to move the current block left
+                    display_block( ERASE );
+                    cmd_move_left();
+                    display_block( PAINT_ACTIVE );
+                    break;
+
+        case CMD_ROTATE_CCW: // try to rotate the current block
+                    display_block( ERASE );
+                    cmd_rotate(1);
+                    display_block( PAINT_ACTIVE );
+                    break;
+
+        case CMD_ROTATE_CW: // try to rotate the current block
+                    display_block( ERASE );
+                    cmd_rotate(-1);
+                    display_block( PAINT_ACTIVE );
   	            break;
 
-  	case CMD_ROTATE_CCW: // try to rotate the current block
-  	            display_block( ERASE );
-  	            cmd_rotate(1);
-  	            display_block( PAINT_ACTIVE );
-  	            break;
+        case CMD_RIGHT: // try to move the current block right
+                    display_block( ERASE );
+                    cmd_move_right();
+                    display_block( PAINT_ACTIVE );
+                    break;
 
-  	case CMD_ROTATE_CW: // try to rotate the current block
-  	            display_block( ERASE );
-  	            cmd_rotate(-1);
-  	            display_block( PAINT_ACTIVE );
-  	            break;
-
-  	case CMD_RIGHT: // try to move the current block right
-  	            display_block( ERASE );
-  	            cmd_move_right();
-  	            display_block( PAINT_ACTIVE );
-                break;
-
-  	case CMD_DROP: // drop the current block
+        case CMD_DROP: // drop the current block
   	            display_block( ERASE );
   	            for( ; test_if_block_fits(); ) {
   	              current_row++;
@@ -1302,29 +1307,30 @@ void check_handle_command( void ) {
   	            current_row--;
   	            display_block( PAINT_FIXED );
 
-                // this checks for completed rows and does the
-                // major cleanup and redraw if necessary.
+                    // this checks for completed rows and does the
+                    // major cleanup and redraw if necessary.
   	            cmd_move_down();
   	            break;
 
-  	case CMD_REDRAW: // redraw everything
+        case CMD_REDRAW: // redraw everything
                     #if VT52
                     #else
                     #if VT100_COLOR
                     vt100_default_color();
                     #endif
                     #endif
-  	            display_board(ROWS);
+                    vt100_clear_screen();
+                    display_board(ROWSD);
   	            display_score();
-  	            display_block( PAINT_ACTIVE );
-  	            break;
+                    display_block( PAINT_ACTIVE );
+                    break;
 
-  	case CMD_START: // quit and (re-) start the game
-  	            init_game();
-  	            break;
-  	            
-    default:
-  	            // do nothing
+        case CMD_START: // quit and (re-) start the game
+                    init_game();
+                    break;
+
+        default:
+                    // do nothing
   	            break;
   	}
 }
