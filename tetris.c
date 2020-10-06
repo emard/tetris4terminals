@@ -253,13 +253,14 @@ unsigned char power_of_two( unsigned char nbits ) {
 // VT100 block colors (first 8 matters)
 unsigned char index2color[] = {
  103, // yellow box 2x2
- 100, // gray box 2x2
+ 47,  // white box 2x2
  45,  // lilac T-shape
  46,  // cyan straight 1x4
  42,  // green S-shape
  41,  // red Z-shape
  43,  // orange L-shape
  44,  // blue J-shape
+ 100, // gray
  101, // bright red
  102, // bright green
  103, // yellow
