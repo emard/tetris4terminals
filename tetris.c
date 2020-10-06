@@ -201,6 +201,7 @@ static unsigned char current_block0;    // bit-pattern of the current block,
 static unsigned char current_block1;    // with one four-bit bitmap stored
 static unsigned char current_block2;    // in the lower nibble of each of these
 static unsigned char current_block3;    // variables
+static unsigned char current_rotation;
 
 static signed char current_row;         // row of the current block
 static signed char current_col;         // col of the current block
@@ -240,52 +241,161 @@ unsigned char power_of_two( unsigned char nbits ) {
   return mask;	
 }
 
-
-/**
- * utility function that returns the bit-patterns of the seven 
+/* each block in 4 rotations
+ * utility lookup table that returns the bit-patterns of the seven
  * predefined types (shapes) of Tetris blocks via ROM lookups.
- * This method returns the block in the standard orientation only.
  * We use a 4x4 matrix packed into two unsigned chars as
  * (first-row << 4 | second-row), (third-row << 4 | fourth-row).
- */ 
-unsigned char getRawBlockPattern( unsigned char index ) {
-  switch( index ) {
-              // brown square 2x2
-    case 0:   return  0x06; // 0b00000110;
-    case 1:   return  0x60; // 0b01100000;
-  	
-              // brown square 2x2
-    case 2:   return  0x06; // 0b00000110;
-    case 3:   return  0x60; // 0b01100000;
+*/
+unsigned char rotated_block_pattern[] = {
+  // brown square 2x2, all rotations the same
+  0x06, //  0:0b 0000 0110
+  0x60, //  1:0b 0110 0000
 
-              // yellow cursor-type block    
-    case 4:   return  0x0E; // 0b00001110;
-    case 5:   return  0x40; // 0b01000000;
+  0x06, //  2:0b 0000 0110
+  0x60, //  3:0b 0110 0000
 
-              // red 1x4 block
-    case 6:   return  0x44; // 0b01000100;
-    case 7:   return  0x44; // 0b01000100;
+  0x06, //  4:0b 0000 0110
+  0x60, //  5:0b 0110 0000
 
-              // blue 2+2 shifted block
-    case 8:   return  0x0C; // 0b00001100;
-    case 9:   return  0x60; // 0b01100000;
+  0x06, //  6:0b 0000 0110
+  0x60, //  7:0b 0110 0000
 
-              // green=2+2 shifted block (inverse to blue)
-    case 10:  return  0x06; // 0b00000110;
-    case 11:  return  0xC0; // 0b11000000;
+  // brown square 2x2, all rotations the same
+  0x06, //  8:0b 0000 0110
+  0x60, //  9:0b 0110 0000
 
-              // cyan=3+1 L-shaped block
-    case 12:  return  0x0E; // 0b00001110;
-    case 13:  return  0x20; // 0b00100000;
+  0x06, // 10:0b 0000 0110
+  0x60, // 11:0b 0110 0000
 
-              // lilac 1+3 L-shaped block
-    case 14:  return  0x0E; // 0b00001110;
-    case 15:  return  0x80; // 0b10000000;
-    
-              // we will not arrive here, but the compiler wants this
-    default:  return  0xFF; // 0b11111111;
-  }
-}
+  0x06, // 12:0b 0000 0110
+  0x60, // 13:0b 0110 0000
+
+  0x06, // 14:0b 0000 0110
+  0x60, // 15:0b 0110 0000
+
+  // yellow cursor-type block    
+  // xxx
+  //  x
+  0x0E, // 16:0b 0000 1110
+  0x40, // 17:0b 0100 0000
+
+  0x4C, // 18:0b 0100 1100
+  0x40, // 19:0b 0100 0000
+
+  0x4E, // 20:0b 0100 1110
+  0x00, // 21:0b 0000 0000
+
+  0x46, // 22:0b 0100 0110
+  0x40, // 23:0b 0100 0000
+
+  // red 1x4 block
+  0x44, // 24:0b 0100 0100
+  0x44, // 25:0b 0100 0100
+
+  0x0F, // 26:0b 0000 1111
+  0x00, // 27:0b 0000 0000
+
+  0x44, // 28:0b 0100 0100
+  0x44, // 29:0b 0100 0100
+
+  0x0F, // 30:0b 0000 1111
+  0x00, // 31:0b 0000 0000
+
+  // blue 2+2 shifted block
+  // xx
+  //  xx
+  0x0C, // 32:0b 0000 1100
+  0x60, // 33:0b 0110 0000
+
+  //  x
+  // xx
+  // x
+  0x02, // 34:0b 0000 0010
+  0x64, // 35:0b 0110 0100
+
+  // xx
+  //  xx
+  0x0C, // 36:0b 0000 1100
+  0x60, // 37:0b 0110 0000
+
+  // blue 2+2 shifted block
+  //  x
+  // xx
+  // x
+  0x02, // 38:0b 0000 0010
+  0x64, // 39:0b 0110 0100
+
+  // green=2+2 shifted block (inverse to blue)
+  //  xx
+  // xx
+  0x06, // 40:0b 0000 0110
+  0xC0, // 41:0b 1100 0000
+
+  // x
+  // xx
+  //  x
+  0x04, // 42:0b 0000 0100
+  0x62, // 43:0b 0110 0010
+
+  //  xx
+  // xx
+  0x06, // 44:0b 0000 0110
+  0xC0, // 45:0b 1100 0000
+
+  // x
+  // xx
+  //  x
+  0x04, // 46:0b 0000 0100
+  0x62, // 47:0b 0110 0010
+
+  // cyan=3+1 L-shaped block
+  // xxx
+  //  .x
+  0x0E, // 48:0b 0000 1110
+  0x20, // 49:0b 0010 0000
+
+  //   x
+  //  .x
+  //  xx
+  0x02, // 50:0b 0000 0010
+  0x26, // 51:0b 0010 0110
+
+  //
+  // x.
+  // xxx
+  0x00, // 52:0b 0000 0000
+  0x8E, // 53:0b 1000 1110
+
+  // xx
+  // x.
+  // x 
+  0x0C, // 54:0b 0000 1100
+  0x88, // 55:0b 1000 1000
+
+  // lilac 1+3 L-shaped block
+  // xxx
+  // x.
+  0x0E, // 56:0b 0000 1110
+  0x80, // 57:0b 1000 0000
+
+  //  xx
+  //  .x
+  //   x
+  0x06, // 58:0b 0000 0110
+  0x22, // 59:0b 0010 0010
+
+  //  .x
+  // xxx
+  0x00, // 60:0b 0000 0000
+  0x2E, // 61:0b 0010 1110
+
+  // x
+  // x.
+  // xx
+  0x08, // 62:0b 0000 1000
+  0x8C, // 63:0b 1000 1100
+};
 
 
 /**
@@ -298,14 +408,17 @@ unsigned char getRawBlockPattern( unsigned char index ) {
  * with two utility functions reduced the code size and made the program
  * fit into the 16F627...
  */
-void create_block( unsigned char index ) {
+void create_rotated_block( unsigned char index, unsigned char rotation ) {
   unsigned char tmp;
+  unsigned char i;
+  
+  i = (index<<3) + ((rotation&3)<<1);
 
-  tmp = getRawBlockPattern(index+index);
+  tmp = rotated_block_pattern[i];
   current_block0 = (tmp & 0xf0) >> 4;
   current_block1 = (tmp & 0x0f);
 
-  tmp = getRawBlockPattern(index+index+1);
+  tmp = rotated_block_pattern[i+1];
   current_block2 = (tmp & 0xf0) >> 4;
   current_block3 = (tmp & 0x0f);
 }
@@ -320,10 +433,16 @@ void create_block( unsigned char index ) {
 void create_random_block( void ) {
   unsigned char x;
   x = rand() & 0x7;
-  create_block( x );
+  create_rotated_block(x,0);
   current_index = x;
+  current_rotation = 0;
 }
 
+
+void rotate_block( void ) {
+  current_rotation = (current_rotation+1)&3;
+  create_rotated_block(current_index, current_rotation);
+}
 
 /**
  * helper function to access one nibble (row) of the current block.
@@ -331,65 +450,12 @@ void create_random_block( void ) {
 unsigned char getBlockNibble( unsigned char i ) {
   unsigned char tmp;
   switch( i ) {
-  	case 0: tmp = current_block0; break;
-  	case 1: tmp = current_block1; break;
-  	case 2: tmp = current_block2; break;
-  	case 3: tmp = current_block3; break;
+       case 0: tmp = current_block0; break;
+       case 1: tmp = current_block1; break;
+       case 2: tmp = current_block2; break;
+       case 3: tmp = current_block3; break;
   }
   return tmp;
-}
-
-
-/**
- * helper function for rotate_block()
- */
-void updateBlockNibble( unsigned char i, unsigned char mask ) {
-  switch( i ) {
-    case 0: current_block0 |= mask; break;
-    case 1: current_block1 |= mask; break;  	
-    case 2: current_block2 |= mask; break;
-    case 3: current_block3 |= mask; break;  	
-  }
-}
-
-
-/**
- * rotate the current_block data by 90 degrees (counterclockwise).
- * We use an inplace rotation that uses the upper nibbles of the
- * current_block0..3 variables as intermediate storage.
- * 
- * 
-
- * (- - - -   a b c d)           (a b c d   d h l p)
- * (- - - -   e f g h)           (e f g h   c g k o)
- * (- - - -   i j k l)   =>      (i j k l   b f j n)
- * (- - - -   m n o p)           (m n o p   a e i m)
- * 
-
- */ 
-void rotate_block( void ) {
-  unsigned char i, j;
-
-  // move lower nibble to upper nibbles
-  current_block0 = current_block0 << 4;
-  current_block1 = current_block1 << 4;
-  current_block2 = current_block2 << 4;
-  current_block3 = current_block3 << 4;
-
-  // fill in the rotated bits
-  for( i=0; i < 4; i++ ) {
-    for( j=0; j < 4; j++ ) {
-      if ((getBlockNibble(i) & power_of_two(j+4)) != 0) {
-         updateBlockNibble( j, power_of_two(3-i) );
-      }
-    }
-  }
-
-  // clear upper nibbles again. This is not strictly required,
-  // and uncommented for now to conserve program memory...
-  // for( i=0; i < 4; i++ ) {
-  //  current_block[i] = current_block[i] & 0x0f;
-  // }
 }
 
 
