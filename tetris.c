@@ -885,6 +885,13 @@ void vt100_scroll_region_down(unsigned char b)
 #endif
 
 
+void vt100_erase_to_end_of_line(void)
+{
+    vt100_putc(27);
+    vt100_putc('[');
+    vt100_putc('K');
+}
+
 
 void block_color(unsigned char paintMode)
 {
@@ -978,6 +985,14 @@ void display_board( unsigned char rows ) {
   }
 }
 
+void erase_score( void ) {
+  unsigned char i, j;
+  for(j = 20; j < 22; j++)
+  {
+    vt100_goto(j, 40);
+    vt100_erase_to_end_of_line();
+  }
+}
 
 /**
  * display the current level and score values on the terminal.
@@ -1017,38 +1032,60 @@ void display_score( void ) {
  */
 void check_remove_completed_rows( void ) {
   unsigned char r, removed;
-  removed = 0;
 
-  #if VT100_SCROLL
+  removed = 0;
+  for( r=0; r < ROWS; r++ ) {
+    if (is_complete_row(r)) {
+      removed++;
+      break;
+    }
+  }
+
+  #if VT52
+  #else
   #if VT100_COLOR
   vt100_default_color();
   #endif
+  #if VT100_SCROLL
+  if(removed)
+    erase_score();
+  #endif
   #endif
 
+  removed = 0;
   for( r=0; r < ROWS; r++ ) {
-  	if (is_complete_row(r)) {
-  	  removed++;
-  	  remove_row( r );
-          #if VT100_SCROLL
-          vt100_scroll_region_down(r);
-          #endif
-          if(++lines == 3)
-          {
-            lines = 0;
-            if(level < 9)
-              level_speed(++level);
-          }
-  	}
+    if (is_complete_row(r)) {
+      removed++;
+      remove_row( r );
+      #if VT52
+      #else
+      #if VT100_SCROLL
+      vt100_scroll_region_down(r);
+      #endif
+      #endif
+      if(++lines == 3)
+      {
+        lines = 0;
+        if(level < 9)
+          level_speed(++level);
+      }
+    }
   }
   
   if (removed) {
     vt100_beep();
     block_color(ERASE);
+    #if VT52
+    #else
     #if VT100_SCROLL
     // redraw scrolled out walls on top
     display_board(removed);
     #else
     display_board(ROWS);
+    #endif
+    #if VT100_COLOR
+    vt100_default_color();
+    #endif
     #endif
     display_score();
   }
@@ -1202,7 +1239,6 @@ void check_handle_command( void ) {
   	if (command == CMD_START) {
   	  init_game();	
   	}
-  	display_score(); // flickers somewhat :-(
   	return;
   }
 	
@@ -1271,6 +1307,12 @@ void check_handle_command( void ) {
   	            break;
 
   	case CMD_REDRAW: // redraw everything
+                    #if VT52
+                    #else
+                    #if VT100_COLOR
+                    vt100_default_color();
+                    #endif
+                    #endif
   	            display_board(ROWS);
   	            display_score();
   	            display_block( PAINT_ACTIVE );
