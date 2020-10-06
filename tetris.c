@@ -243,14 +243,32 @@ unsigned char power_of_two( unsigned char nbits ) {
   return mask;	
 }
 
+// VT100 block colors (first 8 matters)
+unsigned char index2color[] = {
+ 103, // yellow box 2x2
+ 103, // yellow box 2x2
+ 45,  // lilac T-shape
+ 46,  // cyan straight 1x4
+ 42,  // green S-shape
+ 41,  // red Z-shape
+ 43,  // orange L-shape
+ 44,  // blue J-shape
+ 101, // bright red
+ 102, // bright green
+ 104, // bright blue
+ 105, // bright lilac
+ 106, // bright cyan
+};
+
 /* each block in 4 rotations
  * utility lookup table that returns the bit-patterns of the seven
  * predefined types (shapes) of Tetris blocks via ROM lookups.
  * We use a 4x4 matrix packed into two unsigned chars as
  * (first-row << 4 | second-row), (third-row << 4 | fourth-row).
+ * note on the screen it will be mirrored left-right
 */
 unsigned char rotated_block_pattern[] = {
-  // brown square 2x2, all rotations the same
+  // yellow square 2x2, all rotations the same
   0x06, //  0:0b 0000 0110
   0x60, //  1:0b 0110 0000
 
@@ -263,7 +281,7 @@ unsigned char rotated_block_pattern[] = {
   0x06, //  6:0b 0000 0110
   0x60, //  7:0b 0110 0000
 
-  // brown square 2x2, all rotations the same
+  // yellow square 2x2, all rotations the same
   0x06, //  8:0b 0000 0110
   0x60, //  9:0b 0110 0000
 
@@ -276,7 +294,7 @@ unsigned char rotated_block_pattern[] = {
   0x06, // 14:0b 0000 0110
   0x60, // 15:0b 0110 0000
 
-  // yellow cursor-type block    
+  // lilac T-shape block
   // xxx
   //  x
   0x0E, // 16:0b 0000 1110
@@ -291,7 +309,7 @@ unsigned char rotated_block_pattern[] = {
   0x46, // 22:0b 0100 0110
   0x40, // 23:0b 0100 0000
 
-  // red 1x4 block
+  // cyan 1x4 block
   0x44, // 24:0b 0100 0100
   0x44, // 25:0b 0100 0100
 
@@ -304,7 +322,7 @@ unsigned char rotated_block_pattern[] = {
   0x0F, // 30:0b 0000 1111
   0x00, // 31:0b 0000 0000
 
-  // blue 2+2 shifted block
+  // red 2+2 shifted block
   // xx
   //  xx
   0x0C, // 32:0b 0000 1100
@@ -321,14 +339,13 @@ unsigned char rotated_block_pattern[] = {
   0x0C, // 36:0b 0000 1100
   0x60, // 37:0b 0110 0000
 
-  // blue 2+2 shifted block
   //  x
   // xx
   // x
   0x02, // 38:0b 0000 0010
   0x64, // 39:0b 0110 0100
 
-  // green=2+2 shifted block (inverse to blue)
+  // green 2+2 shifted block (inverse to red)
   //  xx
   // xx
   0x06, // 40:0b 0000 0110
@@ -351,7 +368,7 @@ unsigned char rotated_block_pattern[] = {
   0x04, // 46:0b 0000 0100
   0x62, // 47:0b 0110 0010
 
-  // cyan=3+1 L-shaped block
+  // blue 3+1 L-shaped block
   // xxx
   //  .x
   0x0E, // 48:0b 0000 1110
@@ -375,7 +392,7 @@ unsigned char rotated_block_pattern[] = {
   0x0C, // 54:0b 0000 1100
   0x88, // 55:0b 1000 1000
 
-  // lilac 1+3 L-shaped block
+  // orange 1+3 L-shaped block
   // xxx
   // x.
   0x0E, // 56:0b 0000 1110
@@ -857,7 +874,6 @@ void vt100_scroll_region_down(unsigned char b)
 #endif
 
 
-unsigned char index2color[] = {41,42,43,44,45,46,101,102,103,104,105,106};
 
 void block_color(unsigned char paintMode)
 {
