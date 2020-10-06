@@ -250,11 +250,11 @@ unsigned char power_of_two( unsigned char nbits ) {
  */ 
 unsigned char getRawBlockPattern( unsigned char index ) {
   switch( index ) {
-  	          // brown square 2x2
+              // brown square 2x2
     case 0:   return  0x06; // 0b00000110;
     case 1:   return  0x60; // 0b01100000;
   	
-  	          // brown square 2x2
+              // brown square 2x2
     case 2:   return  0x06; // 0b00000110;
     case 3:   return  0x60; // 0b01100000;
 
