@@ -457,8 +457,9 @@ void create_rotated_block( unsigned char index, unsigned char rotation ) {
  * instead of 0..6.
  */
 void create_random_block( void ) {
-  unsigned char x;
-  x = rand() & 0x7;
+  unsigned char x = 0;
+  while(x == 0)
+    x = rand() & 7;
   create_rotated_block(x,0);
   current_index = x;
   current_rotation = 0;
