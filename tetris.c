@@ -232,6 +232,7 @@ static unsigned int  score;
 #define CMD_START    ((unsigned char) 's')
 #define CMD_QUIT     ((unsigned char) 'q')
 #define CMD_CTRLC    ((unsigned char) 'C'-'@')
+#define CMD_ESC      ((unsigned char) 27)
 
 // high-scores: 1 point per new block, 20 points per completed row
 #define SCORE_PER_BLOCK  ((unsigned char) 1)
@@ -1230,7 +1231,7 @@ bit timeout( void ) {
 void check_handle_command( void ) {
   unsigned char tmp;
   
-  if(command == CMD_QUIT || command == CMD_CTRLC)
+  if(command == CMD_QUIT || command == CMD_CTRLC || command == CMD_ESC)
     exit(0);
   
   // if the game is over, we only react to the 's' restart command.
