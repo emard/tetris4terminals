@@ -149,6 +149,7 @@
 // 1: VT100->VT52
 #define VT52 0
 #define VT100_COLOR 1
+#define VT100_SCROLL 1
 
 typedef unsigned char bit; // compatiblity
 
@@ -695,6 +696,18 @@ void vt100_xtoa( unsigned char val ) {
   vt100_putc( vt100_hex( c ));
 }
 
+
+void vt100_itoa( unsigned char val ) {
+  unsigned char c;
+  if(val >= 10)
+  {
+    c = (val / 10) & 0x0f;
+    vt100_putc( vt100_hex( c ));
+  }
+  c = (val % 10);
+  vt100_putc( vt100_hex( c ));
+}
+
 /**
  * move the VT100 cursor to the given position.
  * This is done by sending 'ESC Y l c'
@@ -709,9 +722,9 @@ void vt100_goto( unsigned char row, unsigned char col ) {
 #else
   vt100_putc( 27 );    // ESC
   vt100_putc( '[' );
-  vt100_xtoa(row+1);
+  vt100_itoa(row+1);
   vt100_putc( ';' );
-  vt100_xtoa(col+1);
+  vt100_itoa(col+1);
   vt100_putc( 'H' );  // set cursor
 #endif
 }
@@ -728,6 +741,37 @@ void vt100_bgcolor(unsigned char color)
   vt100_xtoa(color);
   vt100_putc('m');  // set color
 }
+
+#if VT100_SCROLL
+void vt100_scroll_region_down(unsigned char b)
+{
+  vt100_cursor_home(); // to top of regin
+
+  vt100_putc(27);    // ESC
+  vt100_putc('[');
+  vt100_putc('1');
+  vt100_putc( ';' );
+  vt100_itoa(b+1);
+  vt100_putc( 'r' );  // set region
+
+  vt100_putc(27);    // turn on region, origin mode
+  vt100_putc('[');
+  vt100_putc('?');
+  vt100_putc('6');
+  vt100_putc('h');
+
+  vt100_cursor_home(); // to top of regin
+
+  vt100_putc(27);
+  vt100_putc('M');   // at top of region, scroll down
+
+  vt100_putc(27);    // turn off region
+  vt100_putc('[');
+  vt100_putc('?');
+  vt100_putc('6');
+  vt100_putc('l');
+}
+#endif
 
 
 unsigned char index2color[] = {41,42,43,44,45,46,101,102,103,104,105,106};
@@ -795,12 +839,12 @@ void display_block( unsigned char paintMode ) {
  * This method redraws the whole gaming board including borders.
  * Use another call to display_block() to also draw the current block.
  */
-void display_board( void ) {
+void display_board( unsigned char rows ) {
   unsigned char r,c,k;
   unsigned char ch;
 
   vt100_cursor_home();
-  for( r=0; r < ROWS; r++ ) {
+  for( r=0; r < rows; r++ ) {
 
     vt100_goto( r, 2*DRAW_MULTI );
 
@@ -862,13 +906,22 @@ void display_score( void ) {
  * check for completed rows and remove them from the gaming board.
  */
 void check_remove_completed_rows( void ) {
-  unsigned char r, flag;
-  
-  flag = 0;
+  unsigned char r, removed;
+  removed = 0;
+
+  #if VT100_SCROLL
+  #if VT100_COLOR
+  vt100_default_color();
+  #endif
+  #endif
+
   for( r=0; r < ROWS; r++ ) {
   	if (is_complete_row(r)) {
-  	  flag = 1;
+  	  removed++;
   	  remove_row( r );
+          #if VT100_SCROLL
+          vt100_scroll_region_down(r);
+          #endif
           if(++lines == 3)
           {
             lines = 0;
@@ -878,10 +931,15 @@ void check_remove_completed_rows( void ) {
   	}
   }
   
-  if (flag) {
+  if (removed) {
     vt100_beep();
     block_color(ERASE);
-    display_board();
+    #if VT100_SCROLL
+    // redraw scrolled out walls on top
+    display_board(removed);
+    #else
+    display_board(ROWS);
+    #endif
     display_score();
   }
 }
@@ -994,7 +1052,7 @@ void init_game( void ) {
 #endif
   vt100_clear_screen();
   clear_board();
-  display_board();
+  display_board(ROWS);
 
   current_row = 0;
   current_col = 4;
@@ -1095,7 +1153,7 @@ void check_handle_command( void ) {
   	            break;
 
   	case CMD_REDRAW: // redraw everything
-  	            display_board();
+  	            display_board(ROWS);
   	            display_score();
   	            display_block( PAINT_ACTIVE );
   	            break;
