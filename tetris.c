@@ -653,6 +653,12 @@ void vt100_clear_screen(void)
 }
 
 
+void vt100_beep(void)
+{
+  vt100_putc(7);
+}
+
+
 /**
  * helper function to convert a hex-digit into a character 0..9 a..f
  */
@@ -825,8 +831,9 @@ void check_remove_completed_rows( void ) {
   }
   
   if (flag) {
-  	display_board();
-  	display_score();
+    vt100_beep();
+    display_board();
+    display_score();
   }
 }
 
