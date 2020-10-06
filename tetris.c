@@ -687,9 +687,9 @@ void vt100_goto( unsigned char row, unsigned char col ) {
 #else
   vt100_putc( 27 );    // ESC
   vt100_putc( '[' );
-  vt100_xtoa(row);
+  vt100_xtoa(row+1);
   vt100_putc( ';' );
-  vt100_xtoa(col);
+  vt100_xtoa(col+1);
   vt100_putc( 'H' );  // set cursor
 #endif
 }
