@@ -135,8 +135,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-// graphics
-
+// graphics chars printed
 #define CHAR_SPACE  ' '
 #define CHAR_WALL   '|'
 #define CHAR_ACTIVE 'H'
@@ -146,10 +145,18 @@
 #define DRAW_MULTI  2
 
 // switch VT100 to VT52 mode and use VT52 controls
-// 0: VT100 default
-// 1: VT100->VT52
+// 0: VT100 default (may have color)
+// 1: VT100->VT52 (no color)
 #define VT52 0
+
+// VT100 color or mono
+// 0: VT100 monochrome
+// 1: VT100 color
 #define VT100_COLOR 1
+
+// VT100 terminal scroll
+// 0: redraw board (fixed blocks loose color after scrolling)
+// 1: VT100 scroll (fixed blocks keep color after scrolling)
 #define VT100_SCROLL 1
 
 typedef unsigned char bit; // compatiblity
