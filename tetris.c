@@ -17,15 +17,14 @@
  * Use the following keys to control the game:
  * 
  * 'j'        - move current block left
+ * 'l'        - move current block right
  * 'k'        - rotate current block counter-clockwise
  * 'i'        - rotate current block clockwise
- * 'l'        - move current block right
- * 'space'    - drop current block               
+ * 'space'    - drop current block
  * 'r'        - redraw the screen
  * 's'        - start new game (or give up current game)
  * 'q'        - quit
- * 'f'        - faster
- * 'd'        - slower
+ * ctrl-'c'   - quit
  * 
  * Tip: if you run the demo via the Hades simulator, please type at most
  * one command key during each repaint iteration. Otherwise, the 16F628
@@ -232,6 +231,7 @@ static unsigned int  score;
 #define CMD_REDRAW   ((unsigned char) 'r')
 #define CMD_START    ((unsigned char) 's')
 #define CMD_QUIT     ((unsigned char) 'q')
+#define CMD_CTRLC    ((unsigned char) 'C'-'@')
 
 // high-scores: 1 point per new block, 20 points per completed row
 #define SCORE_PER_BLOCK  ((unsigned char) 1)
@@ -1185,7 +1185,7 @@ bit timeout( void ) {
 void check_handle_command( void ) {
   unsigned char tmp;
   
-  if(command == CMD_QUIT)
+  if(command == CMD_QUIT || command == CMD_CTRLC)
     exit(0);
   
   // if the game is over, we only react to the 's' restart command.
