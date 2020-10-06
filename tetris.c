@@ -593,6 +593,26 @@ void vt100_default_color()
   vt100_putc( 'm' );
 }
 
+void vt100_full_screen()
+{
+  vt100_putc( 27 );
+  vt100_putc( '[' );
+  vt100_putc( '1' );
+  vt100_putc( ';' );
+  vt100_putc( '2' );
+  vt100_putc( '4' );
+  vt100_putc( 'r' );
+
+  // cursor down
+  vt100_putc( 27 );
+  vt100_putc( '[' );
+  vt100_putc( '2' );
+  vt100_putc( '4' );
+  vt100_putc( ';' );
+  vt100_putc( '1' );
+  vt100_putc( 'H' );
+}
+
 void reset_terminal_mode()
 {
   int r;
@@ -601,6 +621,9 @@ void reset_terminal_mode()
 #else
 #if VT100_COLOR
   vt100_default_color();
+#endif
+#if VT100_SCROLL
+  vt100_full_screen();
 #endif
 #endif
   r = ioctl(0, TCSETS, &orig_termios);
