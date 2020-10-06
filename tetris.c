@@ -12,7 +12,7 @@
  * exact baud-clock. The low clock rate was chosen to make the program
  * (almost) useable in a simulator; you might want to use 4 MHz or 16 MHz
  * and 19200 or 38400 kbaud for real hardware. This requires changing the
- * RX/TX settings in vt100_initialize().
+ * RX/TX settings in terminal_initialize().
  * 
  * Use the following keys to control the game:
  * 
@@ -143,6 +143,10 @@
 
 // 1-single char, 2-double char, ...
 #define DRAW_MULTI  2
+
+// switch VT100 to VT52 mode and use VT52 controls
+#define VT52 0
+
 
 typedef unsigned char bit; // compatiblity
 
@@ -579,7 +583,9 @@ void vt100_exit_vt52_mode( void ) {
 void reset_terminal_mode()
 {
   int r;
+#if VT52
   vt100_exit_vt52_mode();
+#endif
   r = ioctl(0, TCSETS, &orig_termios);
 }
 
@@ -595,9 +601,8 @@ void level_speed(unsigned char level)
  * initialize the serial communication parameters.
  * We also put some timer initialization here. 
  */
-void vt100_initialize( void ) {
+void terminal_initialize( void ) {
   int r;
-  //int mode;
   char buf[2];
 
   buf[1] = 0;
@@ -616,26 +621,19 @@ void vt100_initialize( void ) {
 }
 
 
-/**
- * move the VT100 cursor to the given position.
- * This is done by sending 'ESC Y l c'
- * NOTE: VT52 expects an offset of 32 for the l and c values.
- */
-void vt100_goto( unsigned char row, unsigned char col ) {
-  vt100_putc( 27 );   // ESC
-  vt100_putc( 'Y' );  // ESC-Y
-  vt100_putc( (row+32) );
-  vt100_putc( (col+32) );
-}
-
-
 /** 
  * request a VT100 cursor-home command on the terminal via tx.
  * We send the VT100/VT52 command 'ESC H'.
  */
 void vt100_cursor_home( void ) {
+#if VT52
   vt100_putc( 27 );    // ESC
   vt100_putc( 'H' );
+#else
+  vt100_putc( 27 );    // ESC
+  vt100_putc( '[' );
+  vt100_putc( 'H' );
+#endif
 }
 
 
@@ -644,8 +642,14 @@ void vt100_cursor_home( void ) {
 void vt100_clear_screen(void)
 {
   vt100_cursor_home();
+#if VT52
   vt100_putc(27);
   vt100_putc('J');  // clear to end of screen
+#else
+  vt100_putc( 27 );    // ESC
+  vt100_putc( '[' );
+  vt100_putc( 'J' );  // clear to end of screen
+#endif
 }
 
 
@@ -669,6 +673,26 @@ void vt100_xtoa( unsigned char val ) {
   vt100_putc( vt100_hex( c ));
 }
 
+/**
+ * move the VT100 cursor to the given position.
+ * This is done by sending 'ESC Y l c'
+ * NOTE: VT52 expects an offset of 32 for the l and c values.
+ */
+void vt100_goto( unsigned char row, unsigned char col ) {
+#if VT52
+  vt100_putc( 27 );   // ESC
+  vt100_putc( 'Y' );  // ESC-Y
+  vt100_putc( (row+32) );
+  vt100_putc( (col+32) );
+#else
+  vt100_putc( 27 );    // ESC
+  vt100_putc( '[' );
+  vt100_xtoa(row);
+  vt100_putc( ';' );
+  vt100_xtoa(col);
+  vt100_putc( 'H' );  // set cursor
+#endif
+}
 
 /**
  * display (or erase) the current block at its current position,
@@ -707,7 +731,7 @@ void display_block( unsigned char paintMode ) {
     // understand the VT52 "cursor off" command, and the blinking
     // cursor at the end of a block is really annoying...
     // a "real" VT100/VT52 does work fine without this.
-    vt100_goto( 24, 0 ); 
+    vt100_goto( 23, 0 );
   }
 } // display_block
 
@@ -909,7 +933,9 @@ void display_test_block( void ) {
 
 
 void init_game( void ) {
+#if VT52
   vt100_enter_vt52_mode();
+#endif
   vt100_clear_screen();
   clear_board();
   display_board();
@@ -1049,8 +1075,8 @@ void isr( void ) {
 
 void main(void)
 {
-  vt100_initialize();  // setup the rx/tx and timer parameters
-  init_game();              // initialize the game-board and stuff
+  terminal_initialize();  // setup the rx/tx and timer parameters
+  init_game();            // initialize the game-board and stuff
 
   for( ;; ) {
   	check_handle_command();
