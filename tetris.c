@@ -259,8 +259,8 @@ unsigned char power_of_two( unsigned char nbits ) {
 
 // VT100 block colors (first 8 matters)
 unsigned char index2color[] = {
- 103, // yellow box 2x2
  47,  // white box 2x2
+ 103, // yellow box 2x2
  45,  // lilac T-shape
  46,  // cyan straight 1x4
  42,  // green S-shape
@@ -694,6 +694,9 @@ void vt100_default_color()
   vt100_putc( '4' );
   vt100_putc( '9' );
   vt100_putc( 'm' );
+  vt100_putc( 27 );
+  vt100_putc( '[' );
+  vt100_putc( 'm' );
 }
 
 void vt100_default_scroll_region()
@@ -861,6 +864,11 @@ void vt100_goto( unsigned char row, unsigned char col ) {
 
 void vt100_bgcolor(unsigned char color)
 {
+  vt100_putc( 27 );
+  vt100_putc( '[' );
+  if(color >= 100)
+    vt100_putc( '5' );
+  vt100_putc( 'm' );
   vt100_putc(27);    // ESC
   vt100_putc('[');
   if(color >= 100)
