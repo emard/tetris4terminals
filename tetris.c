@@ -137,6 +137,7 @@
 // graphics chars printed
 #define CHAR_SPACE  ' '
 #define CHAR_WALL   '|'
+#define CHAR_FLOOR  '|'
 #define CHAR_ACTIVE 'H'
 #define CHAR_FIXED  'X'
 
@@ -191,12 +192,12 @@ struct termios
 };
 struct termios orig_termios, current_termios;
 
-#define ROWS  ((unsigned char) 32) // must be divisible by 8
+#define ROWS  ((unsigned char) 24) // must be divisible by 8
 #define COLS  ((unsigned char) 10)
 
-#define ROWSD ((unsigned char) 24) // last N rows displayed
+#define ROWSD ((unsigned char) 23) // last N rows of active gamefield displayed
 #define ROW0  (ROWS-ROWSD) // first row displayed
-#define ROWNEW 7 // ROW in memory where new piece appears
+#define ROWNEW 0 // ROW in memory where new piece appears
 
 #define PAINT_FIXED  ((unsigned char) 2)
 #define PAINT_ACTIVE ((unsigned char) 1)
@@ -997,6 +998,14 @@ void display_board( unsigned char rows ) {
     // 
     // vt100_putc( 13 );
     // vt100_putc( 10 );
+  }
+
+  if(r == ROWSD)
+  {
+    // print floor
+    vt100_goto( r, 2*DRAW_MULTI );
+    for(k = 0; k < DRAW_MULTI*(COLS+2); k++)
+      vt100_putc( CHAR_FLOOR );
   }
 }
 
