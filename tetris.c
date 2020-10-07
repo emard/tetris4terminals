@@ -160,6 +160,11 @@ unsigned char VT100_color = 1;
 // 1: VT100 scroll (fixed blocks keep color after scrolling)
 unsigned char VT100_scroll = 1;
 
+// max level
+//  9: (default), 0.1s delay between steps
+// 10: difficult, no delay between steps (max terminal speed)
+unsigned char MAX_level = 9;
+
 typedef unsigned char bit; // compatiblity
 
 #define TCGETS           0x5401
@@ -747,7 +752,7 @@ void reset_terminal_mode()
 
 void level_speed(unsigned char level)
 {
-  current_termios.c_cc[VTIME] = level < 10 ? 10-level : 1; // *0.1s timeout
+  current_termios.c_cc[VTIME] = level <= 10 ? 10-level : 0; // *0.1s timeout
   ioctl(0, TCSETS, &current_termios);
 }
 
@@ -1098,7 +1103,7 @@ void check_remove_completed_rows( void ) {
       if(++lines == 3)
       {
         lines = 0;
-        if(level < 9)
+        if(level < MAX_level)
           level_speed(++level);
       }
     }
@@ -1401,6 +1406,10 @@ int main(int argc, char *argv[])
         clock_gettime(0, &tp);
         srand(tp.tv_sec);
         break;
+
+      case 'x': // max level 10, max terminal speed
+        MAX_level = 10;
+        break;
       
       case 'h':
         puts("options:");
@@ -1409,6 +1418,7 @@ int main(int argc, char *argv[])
         puts(" -s  : VT100 no scroll controls (remove line by redrawing monochrome board)");
         puts(" -c  : single-char width for 8x8 font (instead of double-char for 8x8 font)");
         puts(" -r  : each run new random sequence (instead of always the same sequence)");
+        puts(" -x  : enable level 10, max terminal speed, difficult/impossible to play");
         puts("use the following keys to control the game:");
         puts(" 'j' : move current block left");
         puts(" 'l' : move current block right");
