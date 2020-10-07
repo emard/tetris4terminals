@@ -192,11 +192,11 @@ struct termios
 };
 struct termios orig_termios, current_termios;
 
+// saxonsoc needs this
 struct timespec_local {
   time_t tv_sec;
   long tv_nsec;
 };
-void clock_gettime(int, void *);
 
 #define ROWS  ((unsigned char) 24) // must be divisible by 8
 #define COLS  ((unsigned char) 10)
