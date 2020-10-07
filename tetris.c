@@ -133,6 +133,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <time.h>
 
 // graphics chars printed
 #define CHAR_SPACE  ' '
@@ -141,23 +142,23 @@
 #define CHAR_ACTIVE 'H'
 #define CHAR_FIXED  'X'
 
-// 1-single char, 2-double char, ...
-#define DRAW_MULTI  2
+// 1-single char (for 8x8 font), 2-double char (for 8x16 font) ...
+unsigned char DRAW_multi = 2;
 
 // switch VT100 to VT52 mode and use VT52 controls
 // 0: VT100 default (may have color)
 // 1: VT100->VT52 (no color)
-#define VT52 0
+unsigned char VT52_mode = 0;
 
 // VT100 color or mono
 // 0: VT100 monochrome
 // 1: VT100 color
-#define VT100_COLOR 1
+unsigned char VT100_color = 1;
 
 // VT100 terminal scroll
 // 0: redraw board (fixed blocks loose color after scrolling)
 // 1: VT100 scroll (fixed blocks keep color after scrolling)
-#define VT100_SCROLL 1
+unsigned char VT100_scroll = 1;
 
 typedef unsigned char bit; // compatiblity
 
@@ -176,7 +177,6 @@ typedef unsigned int     speed_t;
 typedef unsigned int     tcflag_t;
 
 #define NCCS             32
-
 struct termios
 {
     tcflag_t c_iflag;                /* input mode flags */
@@ -191,6 +191,12 @@ struct termios
 #define _HAVE_STRUCT_TERMIOS_C_OSPEED 1
 };
 struct termios orig_termios, current_termios;
+
+struct timespec_local {
+  time_t tv_sec;
+  long tv_nsec;
+};
+void clock_gettime(int, void *);
 
 #define ROWS  ((unsigned char) 24) // must be divisible by 8
 #define COLS  ((unsigned char) 10)
@@ -239,7 +245,6 @@ static unsigned int  score;
 #define CMD_START    ((unsigned char) 's')
 #define CMD_QUIT     ((unsigned char) 'q')
 #define CMD_CTRLC    ((unsigned char) 'C'-'@')
-#define CMD_ESC      ((unsigned char) 27)
 
 // high-scores: 1 point per new block, 20 points per completed row
 #define SCORE_PER_BLOCK  ((unsigned char) 1)
@@ -727,16 +732,15 @@ void vt100_full_screen()
 void reset_terminal_mode()
 {
   int r;
-#if VT52
-  vt100_exit_vt52_mode();
-#else
-#if VT100_COLOR
-  vt100_default_color();
-#endif
-#if VT100_SCROLL
-  vt100_full_screen();
-#endif
-#endif
+  if(VT52_mode)
+    vt100_exit_vt52_mode();
+  else
+  {
+    if(VT100_color)
+      vt100_default_color();
+    if(VT100_scroll)
+      vt100_full_screen();
+  }
   r = ioctl(0, TCSETS, &orig_termios);
 }
 
@@ -777,14 +781,17 @@ void terminal_initialize( void ) {
  * We send the VT100/VT52 command 'ESC H'.
  */
 void vt100_cursor_home( void ) {
-#if VT52
-  vt100_putc( 27 );    // ESC
-  vt100_putc( 'H' );
-#else
-  vt100_putc( 27 );    // ESC
-  vt100_putc( '[' );
-  vt100_putc( 'H' );
-#endif
+  if(VT52_mode)
+  {
+    vt100_putc( 27 );    // ESC
+    vt100_putc( 'H' );
+  }
+  else
+  {
+    vt100_putc( 27 );    // ESC
+    vt100_putc( '[' );
+    vt100_putc( 'H' );
+  }
 }
 
 
@@ -793,14 +800,17 @@ void vt100_cursor_home( void ) {
 void vt100_clear_screen(void)
 {
   vt100_cursor_home();
-#if VT52
-  vt100_putc(27);
-  vt100_putc('J');  // clear to end of screen
-#else
-  vt100_putc( 27 );    // ESC
-  vt100_putc( '[' );
-  vt100_putc( 'J' );  // clear to end of screen
-#endif
+  if(VT52_mode)
+  {
+    vt100_putc(27);
+    vt100_putc('J');  // clear to end of screen
+  }
+  else
+  {
+    vt100_putc( 27 );    // ESC
+    vt100_putc( '[' );
+    vt100_putc( 'J' );  // clear to end of screen
+  }
 }
 
 
@@ -847,20 +857,24 @@ void vt100_itoa( unsigned char val ) {
  * This is done by sending 'ESC Y l c'
  * NOTE: VT52 expects an offset of 32 for the l and c values.
  */
-void vt100_goto( unsigned char row, unsigned char col ) {
-#if VT52
-  vt100_putc( 27 );   // ESC
-  vt100_putc( 'Y' );  // ESC-Y
-  vt100_putc( (row+32) );
-  vt100_putc( (col+32) );
-#else
-  vt100_putc( 27 );    // ESC
-  vt100_putc( '[' );
-  vt100_itoa(row+1);
-  vt100_putc( ';' );
-  vt100_itoa(col+1);
-  vt100_putc( 'H' );  // set cursor
-#endif
+void vt100_goto( unsigned char row, unsigned char col )
+{
+  if(VT52_mode)
+  {
+    vt100_putc( 27 );   // ESC
+    vt100_putc( 'Y' );  // ESC-Y
+    vt100_putc( (row+32) );
+    vt100_putc( (col+32) );
+  }
+  else
+  {
+    vt100_putc( 27 );    // ESC
+    vt100_putc( '[' );
+    vt100_itoa(row+1);
+    vt100_putc( ';' );
+    vt100_itoa(col+1);
+    vt100_putc( 'H' );  // set cursor
+  }
 }
 
 void vt100_bgcolor(unsigned char color)
@@ -881,7 +895,7 @@ void vt100_bgcolor(unsigned char color)
   vt100_putc('m');  // set color
 }
 
-#if VT100_SCROLL
+
 void vt100_scroll_region_down(unsigned char b)
 {
   vt100_cursor_home(); // to top of region
@@ -898,7 +912,6 @@ void vt100_scroll_region_down(unsigned char b)
 
   vt100_default_scroll_region();
 }
-#endif
 
 
 void vt100_erase_to_end_of_line(void)
@@ -911,16 +924,16 @@ void vt100_erase_to_end_of_line(void)
 
 void block_color(unsigned char paintMode)
 {
-  #if VT52
-  #else
-  #if VT100_COLOR
   unsigned char bgcolor;
-
-  bgcolor = 49; // default color (black)
-  bgcolor = paintMode == PAINT_ACTIVE || paintMode == PAINT_FIXED ? index2color[current_index] : 49;
-  vt100_bgcolor(bgcolor);
-  #endif
-  #endif
+  if(VT52_mode == 0)
+  {
+    if(VT100_color)
+    {
+      bgcolor = 49; // default color (black)
+      bgcolor = paintMode == PAINT_ACTIVE || paintMode == PAINT_FIXED ? index2color[current_index] : 49;
+      vt100_bgcolor(bgcolor);
+    }
+  }
 }
 
 
@@ -948,11 +961,11 @@ void display_block( unsigned char paintMode ) {
       cc = XOFFSET + current_col + j;
       if (cc >= XLIMIT) continue; // out of range
       if (getBlockPixel(i,j)) {
-        vt100_goto( rr-ROW0, cc*DRAW_MULTI );
+        vt100_goto( rr-ROW0, cc*DRAW_multi );
         if     (paintMode == PAINT_ACTIVE) draw = CHAR_ACTIVE;
         else if (paintMode == PAINT_FIXED) draw = CHAR_FIXED;
         else                               draw = CHAR_SPACE;
-        for(k = 0; k < DRAW_MULTI; k++)
+        for(k = 0; k < DRAW_multi; k++)
           vt100_putc(draw);
       }
     }
@@ -979,17 +992,17 @@ void display_board( unsigned char rows ) {
   vt100_cursor_home();
   for( r=0; r < rows; r++ ) {
 
-    vt100_goto( r, 2*DRAW_MULTI );
+    vt100_goto( r, 2*DRAW_multi );
 
-    for(k = 0; k < DRAW_MULTI; k++)
+    for(k = 0; k < DRAW_multi; k++)
       vt100_putc( CHAR_WALL );            // one row of the board: border, data, border
 
     for( c=0; c < COLS; c++ ) {
       ch = occupied(r+ROW0,c) ? CHAR_FIXED : CHAR_SPACE;
-      for(k = 0; k < DRAW_MULTI; k++)
+      for(k = 0; k < DRAW_multi; k++)
         vt100_putc( ch );
     }
-    for(k = 0; k < DRAW_MULTI; k++)
+    for(k = 0; k < DRAW_multi; k++)
       vt100_putc( CHAR_WALL );
     
     // a real VT52 wants both linefeed (10) and carriage-return (13).
@@ -1003,8 +1016,8 @@ void display_board( unsigned char rows ) {
   if(r == ROWSD)
   {
     // print floor
-    vt100_goto( r, 2*DRAW_MULTI );
-    for(k = 0; k < DRAW_MULTI*(COLS+2); k++)
+    vt100_goto( r, 2*DRAW_multi );
+    for(k = 0; k < DRAW_multi*(COLS+2); k++)
       vt100_putc( CHAR_FLOOR );
   }
 }
@@ -1065,28 +1078,23 @@ void check_remove_completed_rows( void ) {
     }
   }
 
-  #if VT52
-  #else
-  #if VT100_COLOR
-  vt100_default_color();
-  #endif
-  #if VT100_SCROLL
-  if(removed)
-    erase_score();
-  #endif
-  #endif
+  if(VT52_mode == 0)
+  {
+    if(VT100_color)
+      vt100_default_color();
+    if(VT100_scroll)
+      if(removed)
+        erase_score();
+  }
 
   removed = 0;
   for( r=0; r < ROWS; r++ ) {
     if (is_complete_row(r)) {
       removed++;
       remove_row( r );
-      #if VT52
-      #else
-      #if VT100_SCROLL
-      vt100_scroll_region_down(r-ROW0);
-      #endif
-      #endif
+      if(VT52_mode == 0)
+        if(VT100_scroll)
+          vt100_scroll_region_down(r-ROW0);
       if(++lines == 3)
       {
         lines = 0;
@@ -1099,18 +1107,16 @@ void check_remove_completed_rows( void ) {
   if (removed) {
     vt100_beep();
     block_color(ERASE);
-    #if VT52
-    #else
-    #if VT100_SCROLL
-    // redraw scrolled out walls on top
-    display_board(removed);
-    #else
-    display_board(ROWSD);
-    #endif
-    #if VT100_COLOR
-    vt100_default_color();
-    #endif
-    #endif
+    if(VT52_mode == 0)
+    {
+      if(VT100_scroll)
+        // redraw scrolled out walls on top
+        display_board(removed);
+      else
+        display_board(ROWSD);
+      if(VT100_color)
+        vt100_default_color();
+    }
     display_score();
   }
 }
@@ -1216,13 +1222,11 @@ void display_test_block( void ) {
 
 
 void init_game( void ) {
-#if VT52
-  vt100_enter_vt52_mode();
-#else
-#if VT100_COLOR
-  vt100_default_color();
-#endif
-#endif
+  if(VT52_mode)
+    vt100_enter_vt52_mode();
+  else
+    if(VT100_color)
+      vt100_default_color();
   vt100_clear_screen();
   clear_board();
   display_board(ROWSD);
@@ -1254,7 +1258,7 @@ bit timeout( void ) {
 void check_handle_command( void ) {
   unsigned char tmp;
 
-  if(command == CMD_QUIT || command == CMD_CTRLC || command == CMD_ESC)
+  if(command == CMD_QUIT || command == CMD_CTRLC)
     exit(0);
 
   // if the game is over, we only react to the 's' restart command.
@@ -1284,72 +1288,68 @@ void check_handle_command( void ) {
   tmp = command;
   command = CMD_NONE;
 
-  switch( tmp ) {
+  switch( tmp )
+  {
+    case CMD_NONE: // idle
+      break;
 
-        case CMD_NONE: // idle
-                    break;
+    case CMD_LEFT: // try to move the current block left
+      display_block( ERASE );
+      cmd_move_left();
+      display_block( PAINT_ACTIVE );
+      break;
 
-        case CMD_LEFT: // try to move the current block left
-                    display_block( ERASE );
-                    cmd_move_left();
-                    display_block( PAINT_ACTIVE );
-                    break;
+    case CMD_ROTATE_CCW: // try to rotate the current block
+      display_block( ERASE );
+      cmd_rotate(1);
+      display_block( PAINT_ACTIVE );
+      break;
 
-        case CMD_ROTATE_CCW: // try to rotate the current block
-                    display_block( ERASE );
-                    cmd_rotate(1);
-                    display_block( PAINT_ACTIVE );
-                    break;
+    case CMD_ROTATE_CW: // try to rotate the current block
+      display_block( ERASE );
+      cmd_rotate(-1);
+      display_block( PAINT_ACTIVE );
+      break;
 
-        case CMD_ROTATE_CW: // try to rotate the current block
-                    display_block( ERASE );
-                    cmd_rotate(-1);
-                    display_block( PAINT_ACTIVE );
-  	            break;
+    case CMD_RIGHT: // try to move the current block right
+      display_block( ERASE );
+      cmd_move_right();
+      display_block( PAINT_ACTIVE );
+      break;
 
-        case CMD_RIGHT: // try to move the current block right
-                    display_block( ERASE );
-                    cmd_move_right();
-                    display_block( PAINT_ACTIVE );
-                    break;
+    case CMD_DROP: // drop the current block
+      display_block( ERASE );
+      for( ; test_if_block_fits(); )
+        current_row++;
+	            
+      // now one step back, then paint the block in its
+      // final position.
+      current_row--;
+      display_block( PAINT_FIXED );
 
-        case CMD_DROP: // drop the current block
-  	            display_block( ERASE );
-  	            for( ; test_if_block_fits(); ) {
-  	              current_row++;
-  	            }
-  	            
-  	            // now one step back, then paint the block in its
-  	            // final position.
-  	            current_row--;
-  	            display_block( PAINT_FIXED );
+      // this checks for completed rows and does the
+      // major cleanup and redraw if necessary.
+      cmd_move_down();
+      break;
 
-                    // this checks for completed rows and does the
-                    // major cleanup and redraw if necessary.
-  	            cmd_move_down();
-  	            break;
+    case CMD_REDRAW: // redraw everything
+      if(VT52_mode == 0)
+        if(VT100_color)
+          vt100_default_color();
+      vt100_clear_screen();
+      display_board(ROWSD);
+      display_score();
+      display_block( PAINT_ACTIVE );
+      break;
 
-        case CMD_REDRAW: // redraw everything
-                    #if VT52
-                    #else
-                    #if VT100_COLOR
-                    vt100_default_color();
-                    #endif
-                    #endif
-                    vt100_clear_screen();
-                    display_board(ROWSD);
-  	            display_score();
-                    display_block( PAINT_ACTIVE );
-                    break;
+    case CMD_START: // quit and (re-) start the game
+      init_game();
+      break;
 
-        case CMD_START: // quit and (re-) start the game
-                    init_game();
-                    break;
-
-        default:
-                    // do nothing
-  	            break;
-  	}
+    default:
+      // do nothing
+      break;
+  }
 }
 
 void isr( void ) {
@@ -1371,8 +1371,58 @@ void isr( void ) {
 }
 
 
-void main(void)
+int main(int argc, char *argv[])
 {
+  struct timespec_local tp;
+
+  for (; argc>1 && argv[1][0]=='-'; argc--, argv++)
+  {
+    switch (argv[1][1])
+    {
+      case 'v': // VT100 -> VT52
+        VT52_mode = 1;
+        VT100_scroll = 0;
+        VT100_color = 0;
+        break;
+
+      case 's': // VT100 no scroll controls (redraw board instead)
+        VT100_scroll = 0;
+        break;
+
+      case 'm': // VT100 no color (monochrome)
+        VT100_color = 0;
+        break;
+
+      case 'c': // single-width chars (good for 8x8 font)
+        DRAW_multi = 1;
+        break;
+
+      case 'r': // randomize, each run new random sequence
+        clock_gettime(0, &tp);
+        srand(tp.tv_sec);
+        break;
+      
+      case 'h':
+        puts("options:");
+        puts(" -v  : VT100->VT52 mode (no colors)");
+        puts(" -m  : VT100 monochrome (no colors)");
+        puts(" -s  : VT100 no scroll controls (remove line by redrawing monochrome board)");
+        puts(" -c  : single-char width for 8x8 font (instead of double-char for 8x8 font)");
+        puts(" -r  : each run new random sequence (instead of always the same sequence)");
+        puts("use the following keys to control the game:");
+        puts(" 'j' : move current block left");
+        puts(" 'l' : move current block right");
+        puts(" 'k' : rotate current block counter-clockwise");
+        puts(" 'i' : rotate current block clockwise");
+        puts(" ' ' : drop current block");
+        puts(" 'r' : redraw the screen");
+        puts(" 's' : start new game (or give up current game)");
+        puts(" 'q' : quit (same as ctrl-c)");
+        exit(0);
+        break;
+    }
+  }
+
   terminal_initialize();  // setup the rx/tx and timer parameters
   init_game();            // initialize the game-board and stuff
 
@@ -1380,4 +1430,5 @@ void main(void)
   	check_handle_command();
   	isr();
   }
+  return 0;
 }
