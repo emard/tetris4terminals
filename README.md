@@ -7,3 +7,11 @@ Code is based on slightly updated:
 [Pic16F628 Tetris for Terminals](https://tams.informatik.uni-hamburg.de/applets/hades/webdemos/95-dpi/pic16f628-tetris/tetris.html)
 and adapted to compile with LCC native compiler running on saxonsoc.
 Can be also compiled with GCC and 2-3 warnings.
+
+Few usage examples:
+    
+     make                : compile with GCC for normal unix
+    ./build.sh           : compile with LCC for saxonsoc linux
+    ./tetris             : default tetris for VT100 color
+    ./tetris -h          : print options and key usage
+    ./tetris > /dev/tty1 : take input from stdin, draw on /dev/tty1 terminal
