@@ -1269,6 +1269,7 @@ void check_handle_command( void ) {
   // if the game is over, we only react to the 's' restart command.
   // 
   if (gameover()) {
+    level_speed(1); // reduce CPU usage during game over
     if (command == CMD_START) {
   	  init_game();	
     }
