@@ -187,7 +187,7 @@ long step_ms; // time step of the piece to fall one tile
 #define ROWSD ((unsigned char) 23) // last N rows of active gamefield displayed
 #define ROW0  (ROWS-ROWSD) // first row displayed
 #define ROWNEW 0 // ROW in memory where new piece appears
-#define COLNEW 4 // COL in memory where new piece appears
+#define COLNEW 3 // COL in memory where new piece appears
 
 #define PAINT_FIXED  ((unsigned char) 2)
 #define PAINT_ACTIVE ((unsigned char) 1)
