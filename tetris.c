@@ -134,6 +134,10 @@
 #include <unistd.h>
 #include <errno.h>
 #include <time.h>
+#include <termios.h>
+#ifdef __GNUC__
+#include <sys/ioctl.h>
+#endif
 
 // graphics chars printed
 #define CHAR_SPACE  ' '
@@ -167,45 +171,10 @@ unsigned char MAX_level = 9;
 
 typedef unsigned char bit; // compatiblity
 
-#define TCGETS           0x5401
-#define TCSETS           0x5402
-
-#define ECHO             0000010
-#define ICANON           0000002
-#define ISIG             0000001
-
-#define VTIME 5
-#define VMIN 6
-
-typedef unsigned char    cc_t;
-typedef unsigned int     speed_t;
-typedef unsigned int     tcflag_t;
-
-#define NCCS             32
-struct termios
-{
-    tcflag_t c_iflag;                /* input mode flags */
-    tcflag_t c_oflag;                /* output mode flags */
-    tcflag_t c_cflag;                /* control mode flags */
-    tcflag_t c_lflag;                /* local mode flags */
-    cc_t c_line;                     /* line discipline */
-    cc_t c_cc[NCCS];                 /* control characters */
-    speed_t c_ispeed;                /* input speed */
-    speed_t c_ospeed;                /* output speed */
-#define _HAVE_STRUCT_TERMIOS_C_ISPEED 1
-#define _HAVE_STRUCT_TERMIOS_C_OSPEED 1
-};
 struct termios orig_termios, current_termios;
 
-// saxonsoc needs this
-struct timespec_local {
-  time_t tv_sec;
-  long tv_nsec;
-};
-struct timespec_local time_now;
-
 long time_now_ms, time_next_ms;
-long step_ms = 200; // 0.2s
+long step_ms; // time step of the piece to fall one tile
 
 #define MS_WRAPAROUND 10000
 #define MS_TIMEOUT    1500
@@ -1100,7 +1069,7 @@ void check_remove_completed_rows( void ) {
       if(VT52_mode == 0)
         if(VT100_scroll)
           vt100_scroll_region_down(r-ROW0);
-      if(++lines == 1)
+      if(++lines == 4)
       {
         lines = 0;
         if(level < MAX_level)
@@ -1231,6 +1200,7 @@ void display_test_block( void ) {
 // wraparound 10000 ms = 10 s
 int time_ms()
 {
+  struct timespec time_now;
   clock_gettime(0, &time_now); // reads time
   return (time_now.tv_sec%10)*1000 + time_now.tv_nsec/1000000;
 }
@@ -1441,7 +1411,7 @@ void isr( void ) {
 
 int main(int argc, char *argv[])
 {
-  struct timespec_local tp;
+  struct timespec tp;
 
   for (; argc>1 && argv[1][0]=='-'; argc--, argv++)
   {
