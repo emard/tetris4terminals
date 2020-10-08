@@ -169,6 +169,8 @@ unsigned char VT100_scroll = 1;
 // 10: difficult, no delay between steps (max terminal speed)
 unsigned char MAX_level = 9;
 
+unsigned char EXIT_after_game_over = 1;
+
 typedef unsigned char bit; // compatiblity
 
 struct termios orig_termios, current_termios;
@@ -853,11 +855,18 @@ void vt100_goto( unsigned char row, unsigned char col )
 
 void vt100_bgcolor(unsigned char color)
 {
+  // linux FB workaround:
+  // bright bg colors can be obtained
+  // by enablink blink mode
+  // VT100 standard colors >= 100
+  // look the same as non-bright colors
+  // if blink is not enabled.
   vt100_putc( 27 );
   vt100_putc( '[' );
   if(color >= 100)
     vt100_putc( '5' );
   vt100_putc( 'm' );
+
   vt100_putc(27);    // ESC
   vt100_putc('[');
   if(color >= 100)
@@ -1439,8 +1448,8 @@ int main(int argc, char *argv[])
         srand(time_ms());
         break;
 
-      case 'x': // max level 10, max terminal speed
-        MAX_level = 10;
+      case 'x': // don't leave game after game over
+        EXIT_after_game_over = 0;
         break;
       
       case 'h':
@@ -1450,7 +1459,7 @@ int main(int argc, char *argv[])
         puts(" -s  : VT100 no scroll controls (remove line by redrawing monochrome board)");
         puts(" -c  : single-char width for 8x8 font (instead of double-char for 8x8 font)");
         puts(" -r  : each run new random sequence (instead of always the same sequence)");
-        puts(" -x  : enable level 10, max terminal speed, difficult/impossible to play");
+        puts(" -x  : don't exit after game over");
         puts("use the following keys to control the game:");
         puts(" 'j' : move current block left");
         puts(" 'l' : move current block right");
@@ -1468,7 +1477,7 @@ int main(int argc, char *argv[])
   terminal_initialize();  // setup the rx/tx and timer parameters
   init_game();            // initialize the game-board and stuff
 
-  for( ;; ) {
+  while( (state & GAME_OVER) == 0 && EXIT_after_game_over != 0 ) {
   	check_handle_command();
   	isr();
   }
