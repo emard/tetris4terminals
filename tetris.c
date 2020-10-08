@@ -1228,17 +1228,25 @@ void display_test_block( void ) {
 }
 */
 
-// wraparound 10000 ms (10s)
+// wraparound 10000 ms = 10 s
 int time_ms()
 {
   clock_gettime(0, &time_now); // reads time
   return (time_now.tv_sec%10)*1000 + time_now.tv_nsec/1000000;
 }
 
+
+void set_read_next_time(void)
+{
+  time_next_ms = (time_next_ms + step_ms) % MS_WRAPAROUND;
+}
+
+
 int time_diff_ms()
 {
   return (MS_WRAPAROUND + time_next_ms - time_ms()) % MS_WRAPAROUND;
 }
+
 
 void set_read_timeout(void)
 {
@@ -1254,10 +1262,6 @@ void set_read_timeout(void)
   ioctl(0, TCSETS, &current_termios);
 }
 
-void set_read_next_time(void)
-{
-  time_next_ms = (time_next_ms + step_ms) % MS_WRAPAROUND;
-}
 
 void init_game( void ) {
   if(VT52_mode)
