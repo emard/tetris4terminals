@@ -832,6 +832,7 @@ void vt100_itoa( unsigned char val ) {
  * move the VT100 cursor to the given position.
  * This is done by sending 'ESC Y l c'
  * NOTE: VT52 expects an offset of 32 for the l and c values.
+ * row,col -> y,x
  */
 void vt100_goto( unsigned char row, unsigned char col )
 {
@@ -1084,7 +1085,7 @@ void check_remove_completed_rows( void ) {
         if(level < MAX_level)
         {
           level++;
-          step_ms = (step_ms*3)>>2; // *3/4
+          step_ms = (step_ms*3)>>2; // 3/4 times game speedup
         }
       }
     }
@@ -1206,6 +1207,7 @@ void display_test_block( void ) {
 }
 */
 
+
 // wraparound 10000 ms = 10 s
 int time_ms()
 {
@@ -1237,7 +1239,7 @@ void set_read_timeout(void)
     time_next_ms = time_ms(); // CPU too slow -> skew
   }
   else
-    current_termios.c_cc[VTIME] = time_diff / 100; // ms->0.1s
+    current_termios.c_cc[VTIME] = time_diff / 100; // ms -> 0.1s
   ioctl(0, TCSETS, &current_termios);
 }
 
@@ -1259,7 +1261,7 @@ void init_game( void ) {
   lines = 0;
   level = 1;
   time_next_ms = time_ms();
-  step_ms = 1000; // initial step 1s
+  step_ms = 1000; // level 1 step 1 s -> level 9 step 0.1 s
   set_read_next_time();
 
   state = STATE_IDLE;
@@ -1376,30 +1378,9 @@ void check_handle_command( void ) {
   }
 }
 
-/*
-void read_time()
-{
-  static long tprev;
-  long tnow;
-  long tdiff;
-  tnow = time_ms();
-  //tprev = time_prev.tv_nsec;
-  tdiff = (MS_WRAPAROUND+tnow-tprev) % MS_WRAPAROUND;
-  tprev = tnow;
-  vt100_cursor_home();
-  printf("%15d", tdiff);
-  //printf("%15d %15d", time_now.tv_nsec, time_next.tv_nsec-time_now.tv_nsec);
-}
-*/
-
 
 void isr( void ) {
-  int tim[3];
   int r;
-  int mode;
-  int tnow;
-  static int tnext, tprev;
-  int tdiff;
   char buf[2];
   set_read_timeout();
   r = read(0, buf, 1);
@@ -1407,8 +1388,7 @@ void isr( void ) {
     command = buf[0];
   else
     command = 0;
-  tdiff = time_diff_ms();
-  if(tdiff > MS_TIMEOUT) // time_ms()>time_next_ms
+  if(time_diff_ms() > MS_TIMEOUT) // time_ms() > time_next_ms
   {
     set_read_next_time();
     if(command == 0)
