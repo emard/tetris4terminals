@@ -202,11 +202,11 @@ struct timespec_local {
   time_t tv_sec;
   long tv_nsec;
 };
-
 struct timespec_local time_now;
 
 long time_now_ms, time_next_ms;
-long next_read_ms = 200; // 0.2s
+long step_ms = 200; // 0.2s
+
 #define MS_WRAPAROUND 10000
 #define MS_TIMEOUT    1500
 
@@ -757,14 +757,6 @@ void reset_terminal_mode()
 }
 
 
-void level_speed(unsigned char level)
-{
-  //current_termios.c_cc[VTIME] = level <= 10 ? 10-level : 0; // *0.1s timeout
-  //ioctl(0, TCSETS, &current_termios);
-  next_read_ms = level <= 10 ? (10-level)<<7 : 0;
-}
-
-
 /**
  * initialize the serial communication parameters.
  * We also put some timer initialization here. 
@@ -1108,11 +1100,14 @@ void check_remove_completed_rows( void ) {
       if(VT52_mode == 0)
         if(VT100_scroll)
           vt100_scroll_region_down(r-ROW0);
-      if(++lines == 4)
+      if(++lines == 1)
       {
         lines = 0;
         if(level < MAX_level)
-          level_speed(++level);
+        {
+          level++;
+          step_ms = (step_ms*3)>>2; // *3/4
+        }
       }
     }
   }
@@ -1261,7 +1256,7 @@ void set_read_timeout(void)
 
 void set_read_next_time(void)
 {
-  time_next_ms = (time_next_ms + next_read_ms) % MS_WRAPAROUND;
+  time_next_ms = (time_next_ms + step_ms) % MS_WRAPAROUND;
 }
 
 void init_game( void ) {
@@ -1280,8 +1275,8 @@ void init_game( void ) {
   score = SCORE_PER_BLOCK;  // one block created right now
   lines = 0;
   level = 1;
-  level_speed(level);
   time_next_ms = time_ms();
+  step_ms = 1000; // initial step 1s
   set_read_next_time();
 
   state = STATE_IDLE;
@@ -1309,7 +1304,7 @@ void check_handle_command( void ) {
   // if the game is over, we only react to the 's' restart command.
   // 
   if (gameover()) {
-    level_speed(1); // reduce CPU usage during game over
+    step_ms = 1000; // reduce CPU usage during game over
     if (command == CMD_START) {
   	  init_game();	
     }
@@ -1467,8 +1462,7 @@ int main(int argc, char *argv[])
         break;
 
       case 'r': // randomize, each run new random sequence
-        time_ms();
-        srand(time_now.tv_sec);
+        srand(time_ms());
         break;
 
       case 'x': // max level 10, max terminal speed
