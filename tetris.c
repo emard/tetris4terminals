@@ -1381,13 +1381,10 @@ void check_handle_command( void ) {
         current_row++;
 	            
       // now one step back, then paint the block in its
-      // final position.
+      // final position and allow to move left-right
+      // before sticking it finally
       current_row--;
       display_block( PAINT_FIXED );
-
-      // this checks for completed rows and does the
-      // major cleanup and redraw if necessary.
-      cmd_move_down();
       break;
 
     case CMD_REDRAW: // redraw everything
