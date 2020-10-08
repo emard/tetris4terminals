@@ -1489,7 +1489,7 @@ int main(int argc, char *argv[])
   terminal_initialize();  // setup the rx/tx and timer parameters
   init_game();            // initialize the game-board and stuff
 
-  while( (state & GAME_OVER) == 0 || EXIT_after_game_over != 0 ) {
+  while( (state & GAME_OVER) == 0 || EXIT_after_game_over == 0 ) {
   	check_handle_command();
   	isr();
   }
