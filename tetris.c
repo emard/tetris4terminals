@@ -203,6 +203,13 @@ struct timespec_local {
   long tv_nsec;
 };
 
+struct timespec_local time_now;
+
+long time_now_ms, time_next_ms;
+long next_read_ms = 200; // 0.2s
+#define MS_WRAPAROUND 10000
+#define MS_TIMEOUT    1500
+
 #define ROWS  ((unsigned char) 24) // must be divisible by 8
 #define COLS  ((unsigned char) 10)
 
@@ -752,8 +759,9 @@ void reset_terminal_mode()
 
 void level_speed(unsigned char level)
 {
-  current_termios.c_cc[VTIME] = level <= 10 ? 10-level : 0; // *0.1s timeout
-  ioctl(0, TCSETS, &current_termios);
+  //current_termios.c_cc[VTIME] = level <= 10 ? 10-level : 0; // *0.1s timeout
+  //ioctl(0, TCSETS, &current_termios);
+  next_read_ms = level <= 10 ? (10-level)<<7 : 0;
 }
 
 
@@ -773,7 +781,7 @@ void terminal_initialize( void ) {
   current_termios.c_lflag &= ~(ECHO | ICANON | ISIG);
 
   current_termios.c_cc[VMIN] = 0;
-  current_termios.c_cc[VTIME] = 4; // *0.1s timeout
+  current_termios.c_cc[VTIME] = 1; // *0.1s timeout
 
   r = ioctl(0, TCSETS, &current_termios);
 
@@ -1100,7 +1108,7 @@ void check_remove_completed_rows( void ) {
       if(VT52_mode == 0)
         if(VT100_scroll)
           vt100_scroll_region_down(r-ROW0);
-      if(++lines == 3)
+      if(++lines == 4)
       {
         lines = 0;
         if(level < MAX_level)
@@ -1225,6 +1233,36 @@ void display_test_block( void ) {
 }
 */
 
+// wraparound 10000 ms (10s)
+int time_ms()
+{
+  clock_gettime(0, &time_now); // reads time
+  return (time_now.tv_sec%10)*1000 + time_now.tv_nsec/1000000;
+}
+
+int time_diff_ms()
+{
+  return (MS_WRAPAROUND + time_next_ms - time_ms()) % MS_WRAPAROUND;
+}
+
+void set_read_timeout(void)
+{
+  int time_diff;
+  time_diff = time_diff_ms();
+  if(time_diff > MS_TIMEOUT) // if(time_ms()>time_next_ms)
+  {
+    current_termios.c_cc[VTIME] = 0;
+    time_next_ms = time_ms(); // CPU too slow -> skew
+  }
+  else
+    current_termios.c_cc[VTIME] = time_diff / 100; // ms->0.1s
+  ioctl(0, TCSETS, &current_termios);
+}
+
+void set_read_next_time(void)
+{
+  time_next_ms = (time_next_ms + next_read_ms) % MS_WRAPAROUND;
+}
 
 void init_game( void ) {
   if(VT52_mode)
@@ -1243,7 +1281,9 @@ void init_game( void ) {
   lines = 0;
   level = 1;
   level_speed(level);
-  
+  time_next_ms = time_ms();
+  set_read_next_time();
+
   state = STATE_IDLE;
   command = CMD_NONE;
   display_block( PAINT_ACTIVE );
@@ -1358,20 +1398,43 @@ void check_handle_command( void ) {
   }
 }
 
+/*
+void read_time()
+{
+  static long tprev;
+  long tnow;
+  long tdiff;
+  tnow = time_ms();
+  //tprev = time_prev.tv_nsec;
+  tdiff = (MS_WRAPAROUND+tnow-tprev) % MS_WRAPAROUND;
+  tprev = tnow;
+  vt100_cursor_home();
+  printf("%15d", tdiff);
+  //printf("%15d %15d", time_now.tv_nsec, time_next.tv_nsec-time_now.tv_nsec);
+}
+*/
+
+
 void isr( void ) {
   int tim[3];
   int r;
   int mode;
+  int tnow;
+  static int tnext, tprev;
+  int tdiff;
   char buf[2];
+  set_read_timeout();
   r = read(0, buf, 1);
   if (r > 0)
-  {
     command = buf[0];
-  } 
   else
-  { 
     command = 0;
-    state |= TIMEOUT;
+  tdiff = time_diff_ms();
+  if(tdiff > MS_TIMEOUT) // time_ms()>time_next_ms
+  {
+    set_read_next_time();
+    if(command == 0)
+      state |= TIMEOUT; // timeout ignores command
   }
   fflush(stdout);
 }
@@ -1404,8 +1467,8 @@ int main(int argc, char *argv[])
         break;
 
       case 'r': // randomize, each run new random sequence
-        clock_gettime(0, &tp);
-        srand(tp.tv_sec);
+        time_ms();
+        srand(time_now.tv_sec);
         break;
 
       case 'x': // max level 10, max terminal speed
