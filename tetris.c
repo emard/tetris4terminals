@@ -187,6 +187,7 @@ long step_ms; // time step of the piece to fall one tile
 #define ROWSD ((unsigned char) 23) // last N rows of active gamefield displayed
 #define ROW0  (ROWS-ROWSD) // first row displayed
 #define ROWNEW 0 // ROW in memory where new piece appears
+#define COLNEW 4 // COL in memory where new piece appears
 
 #define PAINT_FIXED  ((unsigned char) 2)
 #define PAINT_ACTIVE ((unsigned char) 1)
@@ -235,6 +236,11 @@ static unsigned int  score;
 
 static unsigned char  state;
 static unsigned char  command;
+
+// 2 fair randomizer pools
+unsigned char shuffled_pool[2][7] = { {0,1,2,3,4,5,6}, {0,1,2,3,4,5,6} };
+unsigned char active_pool = 0; // alternates 0/1
+unsigned char pool_index = 0; // 0-7
 
 /**
  * utility function to calculate (1 << nbits)
@@ -447,18 +453,37 @@ void create_rotated_block( unsigned char index, unsigned char rotation ) {
   current_block3 = (tmp & 0x0f);
 }
 
+// exchange 2 random indices
+void shuffle_inactive_pool()
+{
+  unsigned char x = 7, y = 7;
+  unsigned char i, t;
+  while(x == 7)
+    x = rand() & 7;
+  while(y == 7 || y == x)
+    y = rand() & 7;
+  // x=0..6 y=0..6
+  i = active_pool ^ 1; // inactive pool
+  // exchange using temprary var
+  t = shuffled_pool[i][x];
+  shuffled_pool[i][x] = shuffled_pool[i][y];
+  shuffled_pool[i][y] = t;
+}
+
 
 /**
- * create a new randomly-chosen block.
- * Note that rand() doesn't seem to return zero at all,
- * so the seven types of blocks are indexed via values 1..7
- * instead of 0..6.
+ * create fair-random new block
+ * from the active shuffled pool
  */
 void create_random_block( void ) {
-  unsigned char x = 0;
-  while(x == 0)
-    x = rand() & 7;
-  // x is now random 1-7
+  unsigned char x;
+  shuffle_inactive_pool();
+  x = shuffled_pool[active_pool][pool_index]+1;
+  if(++pool_index == 7)
+  {
+    pool_index = 0;
+    active_pool ^= 1;
+  }
   create_rotated_block(x,0);
   current_index = x;
   current_rotation = 0;
@@ -469,6 +494,7 @@ void rotate_block( char r ) {
   current_rotation = (current_rotation+r)&3;
   create_rotated_block(current_index, current_rotation);
 }
+
 
 /**
  * helper function to access one nibble (row) of the current block.
@@ -1181,7 +1207,7 @@ void cmd_move_down( void ) {
   check_remove_completed_rows(); // repaints all when necessary
 
   current_row = ROWNEW;
-  current_col = 4;
+  current_col = COLNEW;
   
   create_random_block();
   score += SCORE_PER_BLOCK;
@@ -1245,6 +1271,7 @@ void set_read_timeout(void)
 
 
 void init_game( void ) {
+  unsigned char i;
   if(VT52_mode)
     vt100_enter_vt52_mode();
   else
@@ -1254,9 +1281,14 @@ void init_game( void ) {
   clear_board();
   display_board(ROWSD);
 
+  active_pool = 0;
+  for(i = 0; i < 14; i++)
+    shuffle_inactive_pool();
+  active_pool = 1;
   current_row = ROWNEW;
-  current_col = 4;
+  current_col = COLNEW;
   create_random_block();
+
   score = SCORE_PER_BLOCK;  // one block created right now
   lines = 0;
   level = 1;
@@ -1301,7 +1333,7 @@ void check_handle_command( void ) {
   // us with keystrokes :-))
   //
   if (timeout()) {
-  	display_block( ERASE );
+    display_block( ERASE );
     cmd_move_down();
     display_block( PAINT_ACTIVE );
     state |= TIMEOUT;
