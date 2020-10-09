@@ -1328,7 +1328,7 @@ int time_ms()
 }
 
 
-void set_read_next_time()
+void set_next_step_timeout()
 {
   time_next_ms = (time_next_ms + step_ms) % MS_WRAPAROUND;
 }
@@ -1380,7 +1380,7 @@ void init_game()
   level = 1;
   time_next_ms = time_ms();
   step_ms = MS_STEP_START; /* level 1 step 1 s -> level 9 step 0.1 s */
-  set_read_next_time();
+  set_next_step_timeout();
 
   state = STATE_IDLE;
   command = CMD_NONE;
@@ -1512,7 +1512,7 @@ void isr()
     command = 0;
   if(time_diff_ms() > MS_TIMEOUT) /* time_ms() > time_next_ms */
   {
-    set_read_next_time();
+    set_next_step_timeout();
     if(command == 0)
       state |= TIMEOUT; /* timeout ignores command */
   }
