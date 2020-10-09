@@ -178,8 +178,14 @@ struct termios orig_termios, current_termios;
 long time_now_ms, time_next_ms;
 long step_ms; // time step of the piece to fall one tile
 
+// timer wraparounds from 9999 to 0 during 10000 cycles
 #define MS_WRAPAROUND 10000
-#define MS_TIMEOUT    1500
+// starts game with step 1 s at level 1, it's a longest step time
+#define MS_STEP_START 1000
+// timeout should be more than longest step time
+#define MS_TIMEOUT    (MS_STEP_START+500)
+
+#define STEP_FASTER(x) x*3/4
 
 #define ROWS  ((unsigned char) 24) // must be divisible by 8
 #define COLS  ((unsigned char) 10)
@@ -1111,7 +1117,7 @@ void check_remove_completed_rows( void ) {
         if(level < MAX_level)
         {
           level++;
-          step_ms = (step_ms*3)>>2; // 3/4 times game speedup
+          step_ms = STEP_FASTER(step_ms); // 3/4 times game speedup
         }
       }
     }
@@ -1293,7 +1299,7 @@ void init_game( void ) {
   lines = 0;
   level = 1;
   time_next_ms = time_ms();
-  step_ms = 1000; // level 1 step 1 s -> level 9 step 0.1 s
+  step_ms = MS_STEP_START; // level 1 step 1 s -> level 9 step 0.1 s
   set_read_next_time();
 
   state = STATE_IDLE;
@@ -1321,7 +1327,7 @@ void check_handle_command( void ) {
   // if the game is over, we only react to the 's' restart command.
   // 
   if (gameover()) {
-    step_ms = 1000; // reduce CPU usage during game over
+    step_ms = MS_STEP_START; // reduce CPU usage during game over
     if (command == CMD_START) {
   	  init_game();	
     }
