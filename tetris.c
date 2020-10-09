@@ -1423,7 +1423,7 @@ void check_handle_command( void ) {
       display_block( PAINT_FIXED );
 
       // this will stick block immediately
-      // and not allow to move it left-right after drooping
+      // and not allow to move it left-right after dropping
       if(INFINITE_time)
         cmd_move_down();
       break;
