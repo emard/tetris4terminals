@@ -1448,26 +1448,26 @@ void check_handle_command( void ) {
 void isr( void ) {
   int r;
   char buf[2];
+
+  #if USE_TERMIOS
+  set_read_timeout();
+  r = read(0, buf, 1);
+  #endif
+  #if USE_SELECT
+  r = wait_key_or_timeout();
+  if(r > 0)
+    r = read(0, buf, 1);
+  #endif
+  if (r > 0)
+    command = buf[0];
+  else
+    command = 0;
+
   if(time_diff_ms() > MS_TIMEOUT) // time_ms() > time_next_ms
   {
     set_next_step_timeout();
-    state |= TIMEOUT; // timeout ignores command
-  }
-  else
-  {
-    #if USE_TERMIOS
-    set_read_timeout();
-    r = read(0, buf, 1);
-    #endif
-    #if USE_SELECT
-    r = wait_key_or_timeout();
-    if(r > 0)
-      r = read(0, buf, 1);
-    #endif
-    if (r > 0)
-      command = buf[0];
-    else
-      command = 0;
+    if(command == 0) // command has priority to timeout
+      state |= TIMEOUT; // timeout ignores command
   }
 }
 
