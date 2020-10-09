@@ -765,6 +765,15 @@ void vt100_default_scroll_region()
   vt100_putc( 'r' );
 }
 
+/* TODO: better way to cancel scroll region */
+void vt100_reset()
+{
+  vt100_putc( 27 );
+  vt100_putc( 'c' );
+}
+
+
+#if 0
 void vt100_full_screen()
 {
   vt100_default_scroll_region();
@@ -777,6 +786,8 @@ void vt100_full_screen()
   vt100_putc( '1' );
   vt100_putc( 'H' );
 }
+#endif
+
 
 void reset_terminal_mode()
 {
@@ -788,7 +799,7 @@ void reset_terminal_mode()
     if(VT100_color)
       vt100_default_color();
     if(VT100_scroll)
-      vt100_full_screen();
+      vt100_reset();
   }
   r = ioctl(0, TCSETS, &orig_termios);
 }
