@@ -1391,6 +1391,10 @@ void check_handle_command( void ) {
       // before sticking it finally
       current_row--;
       display_block( PAINT_FIXED );
+
+      // this will stick block immediately
+      // and not allow to move it left-right after drooping
+      //cmd_move_down();
       break;
 
     case CMD_REDRAW: // redraw everything
