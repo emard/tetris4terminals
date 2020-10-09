@@ -189,7 +189,7 @@ long step_ms; /* time step of the piece to fall one tile */
 /* timer wraparounds from 9999 to 0 during 10000 cycles */
 #define MS_WRAPAROUND 10000
 /* starts game with step 1 s at level 1, it's a longest step time */
-#define MS_STEP_START 999
+#define MS_STEP_START 1000
 /* timeout should be more than longest step time */
 #define MS_TIMEOUT    (MS_STEP_START+500)
 
@@ -1363,18 +1363,22 @@ void set_read_timeout()
 int wait_key_or_timeout()
 {
   fd_set fds;
-  struct timeval tv = { 0L /*s*/, 0L /*us*/ };
+  struct timeval tv;
   int time_diff;
 
   time_diff = time_diff_ms();
   if(time_diff > MS_TIMEOUT) /* if(time_ms()>time_next_ms) */
   {
+    tv.tv_sec = 0;
     tv.tv_usec = 0;
     if(time_diff < MS_WRAPAROUND-500)
       time_next_ms = time_ms(); /* CPU too slow, >0.5s late -> skew */
   }
   else
-    tv.tv_usec = time_diff * 1000; /* ms -> us */
+  {
+    tv.tv_sec  =  time_diff / 1000; /* ms -> s */
+    tv.tv_usec = (time_diff % 1000) * 1000; /* ms -> us fractional */
+  }
 
   FD_ZERO(&fds);
   FD_SET(0, &fds);
