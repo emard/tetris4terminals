@@ -248,16 +248,6 @@ unsigned char shuffled_pool[2][7] = { {0,1,2,3,4,5,6}, {0,1,2,3,4,5,6} };
 unsigned char active_pool = 0; // alternates 0/1
 unsigned char pool_index = 0; // 0-7
 
-/**
- * utility function to calculate (1 << nbits)
- */
-unsigned char power_of_two( unsigned char nbits ) {
-  unsigned char mask;
-  
-  mask = (1 << nbits);
-  return mask;	
-}
-
 // VT100 block colors (first 8 matters)
 unsigned char index2color[] = {
  47,  // white box 2x2
@@ -432,6 +422,17 @@ unsigned char rotated_block_pattern[] = {
   0x08, // 62:0b 0000 1000
   0x8C, // 63:0b 1000 1100
 };
+
+
+/**
+ * utility function to calculate (1 << nbits)
+ */
+unsigned char power_of_two( unsigned char nbits ) {
+  unsigned char mask;
+  
+  mask = (1 << nbits);
+  return mask;	
+}
 
 
 /**
@@ -1249,7 +1250,7 @@ int time_ms()
 }
 
 
-void set_read_next_time(void)
+void set_next_step_timeout(void)
 {
   time_next_ms = (time_next_ms + step_ms) % MS_WRAPAROUND;
 }
@@ -1300,7 +1301,7 @@ void init_game( void ) {
   level = 1;
   time_next_ms = time_ms();
   step_ms = MS_STEP_START; // level 1 step 1 s -> level 9 step 0.1 s
-  set_read_next_time();
+  set_next_step_timeout();
 
   state = STATE_IDLE;
   command = CMD_NONE;
@@ -1429,8 +1430,8 @@ void isr( void ) {
     command = 0;
   if(time_diff_ms() > MS_TIMEOUT) // time_ms() > time_next_ms
   {
-    set_read_next_time();
-    if(command == 0)
+    set_next_step_timeout();
+    if(command == 0) // let command be processed, timeout will reappear immediately after
       state |= TIMEOUT; // timeout ignores command
   }
   fflush(stdout);
