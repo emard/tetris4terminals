@@ -173,6 +173,9 @@ unsigned char VT100_scroll = 1;
 // 10: difficult, no delay between steps (max terminal speed)
 unsigned char MAX_level = 9;
 
+// infinite time to think where to place a piece
+unsigned char INFINITE_time = 0;
+
 unsigned char EXIT_after_game_over = 1;
 
 typedef unsigned char bit; // compatiblity
@@ -942,7 +945,7 @@ void terminal_initialize( void ) {
   current_termios.c_lflag &= ~(ECHO | ICANON | ISIG);
 
   current_termios.c_cc[VMIN] = 0;
-  current_termios.c_cc[VTIME] = 1; // *0.1s timeout
+  current_termios.c_cc[VTIME] = 0; // *0.1s timeout
 
   r = ioctl(0, TCSETS, &current_termios);
 
@@ -1421,7 +1424,8 @@ void check_handle_command( void ) {
 
       // this will stick block immediately
       // and not allow to move it left-right after drooping
-      //cmd_move_down();
+      if(INFINITE_time)
+        cmd_move_down();
       break;
 
     case CMD_REDRAW: // redraw everything
@@ -1449,25 +1453,36 @@ void isr( void ) {
   int r;
   char buf[2];
 
-  #if USE_TERMIOS
-  set_read_timeout();
-  r = read(0, buf, 1);
-  #endif
-  #if USE_SELECT
-  r = wait_key_or_timeout();
-  if(r > 0)
+  if(INFINITE_time)
+  { /* player can think forever */
     r = read(0, buf, 1);
-  #endif
-  if (r > 0)
-    command = buf[0];
+    if (r > 0)
+      command = buf[0];
+    else
+      command = 0;
+  }
   else
-    command = 0;
+  { /* player must think fast */
+    #if USE_TERMIOS
+    set_read_timeout();
+    r = read(0, buf, 1);
+    #endif
+    #if USE_SELECT
+    r = wait_key_or_timeout();
+    if(r > 0)
+      r = read(0, buf, 1);
+    #endif
+    if (r > 0)
+      command = buf[0];
+    else
+      command = 0;
 
-  if(time_diff_ms() > MS_TIMEOUT) // time_ms() > time_next_ms
-  {
-    set_next_step_timeout();
-    if(command == 0) // command has priority to timeout
-      state |= TIMEOUT; // timeout ignores command
+    if(time_diff_ms() > MS_TIMEOUT) // time_ms() > time_next_ms
+    {
+      set_next_step_timeout();
+      if(command == 0) // command has priority to timeout
+        state |= TIMEOUT; // timeout ignores command
+    }
   }
 }
 
@@ -1502,6 +1517,10 @@ int main(int argc, char *argv[])
         srand(time_ms());
         break;
 
+      case 'i': // think forever
+        INFINITE_time = 1;
+        break;
+
       case 'x': // don't leave game after game over
         EXIT_after_game_over = 0;
         break;
@@ -1513,6 +1532,7 @@ int main(int argc, char *argv[])
         puts(" -s  : VT100 no scroll controls (remove line by redrawing monochrome board)");
         puts(" -c  : single-char width for 8x8 font (instead of double-char for 8x8 font)");
         puts(" -r  : each run new random sequence (instead of always the same sequence)");
+        puts(" -i  : infinite time (player can think forever)");
         puts(" -x  : don't exit after game over");
         puts("use the following keys to control the game:");
         puts(" 'j' : move current block left");
