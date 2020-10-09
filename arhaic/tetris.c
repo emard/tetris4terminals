@@ -177,6 +177,9 @@ unsigned char VT100_scroll = 1;
  */
 unsigned char MAX_level = 9;
 
+// infinite time to think where to place a piece
+unsigned char INFINITE_time = 0;
+
 unsigned char EXIT_after_game_over = 1;
 
 typedef unsigned char bit; /* compatiblity */
@@ -758,79 +761,12 @@ void vt100_default_color()
   vt100_putc( 'm' );
 }
 
+
 void vt100_default_scroll_region()
 {
   vt100_putc( 27 );
   vt100_putc( '[' );
-  vt100_putc( '1' );
-  vt100_putc( ';' );
-  vt100_putc( '2' );
-  vt100_putc( '4' );
   vt100_putc( 'r' );
-}
-
-/* TODO: better way to cancel scroll region */
-void vt100_reset()
-{
-  vt100_putc( 27 );
-  vt100_putc( 'c' );
-}
-
-
-#if 0
-void vt100_full_screen()
-{
-  vt100_default_scroll_region();
-  /* cursor down */
-  vt100_putc( 27 );
-  vt100_putc( '[' );
-  vt100_putc( '2' );
-  vt100_putc( '4' );
-  vt100_putc( ';' );
-  vt100_putc( '1' );
-  vt100_putc( 'H' );
-}
-#endif
-
-
-void reset_terminal_mode()
-{
-  int r;
-  if(VT52_mode)
-    vt100_exit_vt52_mode();
-  else
-  {
-    if(VT100_color)
-      vt100_default_color();
-    if(VT100_scroll)
-      vt100_reset();
-  }
-  r = ioctl(0, TCSETS, &orig_termios);
-}
-
-
-/**
- * initialize the serial communication parameters.
- * We also put some timer initialization here. 
- */
-void terminal_initialize()
-{
-  int r;
-  char buf[2];
-
-  buf[1] = 0;
-
-  r = ioctl(0, TCGETS, &orig_termios);
-  current_termios = orig_termios;
-
-  current_termios.c_lflag &= ~(ECHO | ICANON | ISIG);
-
-  current_termios.c_cc[VMIN] = 0;
-  current_termios.c_cc[VTIME] = 1; /* *0.1s timeout */
-
-  r = ioctl(0, TCSETS, &current_termios);
-
-  atexit(reset_terminal_mode);
 }
 
 
@@ -1012,6 +948,50 @@ void block_color(paintMode)
       vt100_bgcolor(bgcolor);
     }
   }
+}
+
+
+void reset_terminal_mode()
+{
+  int r;
+  if(VT52_mode)
+    vt100_exit_vt52_mode();
+  else
+  {
+    if(VT100_color)
+      vt100_default_color();
+    if(VT100_scroll)
+    {
+      vt100_default_scroll_region();
+      vt100_goto(23,0);
+    }
+  }
+  r = ioctl(0, TCSETS, &orig_termios);
+}
+
+
+/**
+ * initialize the serial communication parameters.
+ * We also put some timer initialization here. 
+ */
+void terminal_initialize()
+{
+  int r;
+  char buf[2];
+
+  buf[1] = 0;
+
+  r = ioctl(0, TCGETS, &orig_termios);
+  current_termios = orig_termios;
+
+  current_termios.c_lflag &= ~(ECHO | ICANON | ISIG);
+
+  current_termios.c_cc[VMIN] = 0;
+  current_termios.c_cc[VTIME] = 1; /* *0.1s timeout */
+
+  r = ioctl(0, TCSETS, &current_termios);
+
+  atexit(reset_terminal_mode);
 }
 
 
@@ -1507,9 +1487,10 @@ void check_handle_command()
       display_block( PAINT_FIXED );
 
       /* this will stick block immediately
-       * and not allow to move it left-right after drooping
-       *cmd_move_down();
+       * and not allow to move it left-right after dropping
        */
+      if(INFINITE_time)
+        cmd_move_down();
       break;
 
     case CMD_REDRAW: /* redraw everything */
@@ -1536,13 +1517,17 @@ void isr()
 {
   int r;
   char buf[2];
-  if(time_diff_ms() > MS_TIMEOUT) /* time_ms() > time_next_ms */
-  {
-    set_next_step_timeout();
-    state |= TIMEOUT; /* timeout ignores command */
+
+  if(INFINITE_time)
+  { /* player can think forever */
+    r = read(0, buf, 1);
+    if (r > 0)
+      command = buf[0];
+    else
+      command = 0;
   }
   else
-  {
+  { /* player must think fast */
     #if USE_TERMIOS
     set_read_timeout();
     r = read(0, buf, 1);
@@ -1556,6 +1541,13 @@ void isr()
       command = buf[0];
     else
       command = 0;
+
+    if(time_diff_ms() > MS_TIMEOUT) /* time_ms() > time_next_ms */
+    {
+      set_next_step_timeout();
+      if(command == 0) /* command has priority to timeout */
+        state |= TIMEOUT; /* timeout ignores command */
+    }
   }
 }
 
@@ -1592,6 +1584,10 @@ int main(argc, argv)
         srand(time_ms());
         break;
 
+      case 'i': // think forever
+        INFINITE_time = 1;
+        break;
+
       case 'x': /* don't leave game after game over */
         EXIT_after_game_over = 0;
         break;
@@ -1603,6 +1599,7 @@ int main(argc, argv)
         puts(" -s  : VT100 no scroll controls (remove line by redrawing monochrome board)");
         puts(" -c  : single-char width for 8x8 font (instead of double-char for 8x8 font)");
         puts(" -r  : each run new random sequence (instead of always the same sequence)");
+        puts(" -i  : infinite time (player can think forever)");
         puts(" -x  : don't exit after game over");
         puts("use the following keys to control the game:");
         puts(" 'j' : move current block left");
