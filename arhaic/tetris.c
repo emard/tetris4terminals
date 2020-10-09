@@ -139,6 +139,10 @@
 #include <sys/ioctl.h>
 #endif
 
+/* how to wait for key (enable one of) */
+#define USE_TERMIOS  1
+#define USE_SELECT   0
+
 /* graphics chars printed */
 #define CHAR_SPACE  ' '
 #define CHAR_WALL   '|'
@@ -185,7 +189,7 @@ long step_ms; /* time step of the piece to fall one tile */
 /* timer wraparounds from 9999 to 0 during 10000 cycles */
 #define MS_WRAPAROUND 10000
 /* starts game with step 1 s at level 1, it's a longest step time */
-#define MS_STEP_START 1000
+#define MS_STEP_START 999
 /* timeout should be more than longest step time */
 #define MS_TIMEOUT    (MS_STEP_START+500)
 
@@ -1337,6 +1341,7 @@ int time_diff_ms()
 }
 
 
+#if USE_TERMIOS
 void set_read_timeout()
 {
   int time_diff;
@@ -1344,12 +1349,38 @@ void set_read_timeout()
   if(time_diff > MS_TIMEOUT) /* if(time_ms()>time_next_ms) */
   {
     current_termios.c_cc[VTIME] = 0;
-    time_next_ms = time_ms(); /* CPU too slow -> skew */
+    if(time_diff < MS_WRAPAROUND-500)
+      time_next_ms = time_ms(); /* CPU too slow, >0.5s late -> skew */
   }
   else
     current_termios.c_cc[VTIME] = time_diff / 100; /* ms -> 0.1s */
   ioctl(0, TCSETS, &current_termios);
 }
+#endif /* USE_TERMIOS */
+
+
+#if USE_SELECT
+int wait_key_or_timeout()
+{
+  fd_set fds;
+  struct timeval tv = { 0L /*s*/, 0L /*us*/ };
+  int time_diff;
+
+  time_diff = time_diff_ms();
+  if(time_diff > MS_TIMEOUT) /* if(time_ms()>time_next_ms) */
+  {
+    tv.tv_usec = 0;
+    if(time_diff < MS_WRAPAROUND-500)
+      time_next_ms = time_ms(); /* CPU too slow, >0.5s late -> skew */
+  }
+  else
+    tv.tv_usec = time_diff * 1000; /* ms -> us */
+
+  FD_ZERO(&fds);
+  FD_SET(0, &fds);
+  return select(1, &fds, NULL, NULL, &tv);
+}
+#endif /* USE_SELECT */
 
 
 void init_game()
@@ -1501,19 +1532,27 @@ void isr()
 {
   int r;
   char buf[2];
-  set_read_timeout();
-  r = read(0, buf, 1);
-  if (r > 0)
-    command = buf[0];
-  else
-    command = 0;
   if(time_diff_ms() > MS_TIMEOUT) /* time_ms() > time_next_ms */
   {
     set_next_step_timeout();
-    if(command == 0)
-      state |= TIMEOUT; /* timeout ignores command */
+    state |= TIMEOUT; /* timeout ignores command */
   }
-  fflush(stdout);
+  else
+  {
+    #if USE_TERMIOS
+    set_read_timeout();
+    r = read(0, buf, 1);
+    #endif
+    #if USE_SELECT
+    r = wait_key_or_timeout();
+    if(r > 0)
+      r = read(0, buf, 1);
+    #endif
+    if (r > 0)
+      command = buf[0];
+    else
+      command = 0;
+  }
 }
 
 
@@ -1579,8 +1618,9 @@ int main(argc, argv)
   init_game();            /* initialize the game-board and stuff */
 
   while( (state & GAME_OVER) == 0 || EXIT_after_game_over == 0 ) {
-  	check_handle_command();
-  	isr();
+    check_handle_command();
+    fflush(stdout);
+    isr();
   }
   return 0;
 }
