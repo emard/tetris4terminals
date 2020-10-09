@@ -723,22 +723,6 @@ void vt100_default_scroll_region()
 }
 
 
-#if 0
-void vt100_cancel_scroll_region()
-{
-  vt100_default_scroll_region();
-  // cursor down
-  vt100_putc( 27 );
-  vt100_putc( '[' );
-  vt100_putc( '2' );
-  vt100_putc( '4' );
-  vt100_putc( ';' );
-  vt100_putc( '1' );
-  vt100_putc( 'H' );
-}
-#endif
-
-
 /** 
  * request a VT100 cursor-home command on the terminal via tx.
  * We send the VT100/VT52 command 'ESC H'.
