@@ -711,26 +711,17 @@ void vt100_default_color()
   vt100_putc( 'm' );
 }
 
+
 void vt100_default_scroll_region()
 {
   vt100_putc( 27 );
   vt100_putc( '[' );
-  vt100_putc( '1' );
-  vt100_putc( ';' );
-  vt100_putc( '2' );
-  vt100_putc( '4' );
   vt100_putc( 'r' );
 }
 
-// TODO: better way to cancel scroll region
-void vt100_reset()
-{
-  vt100_putc( 27 );
-  vt100_putc( 'c' );
-}
 
 #if 0
-void vt100_full_screen()
+void vt100_cancel_scroll_region()
 {
   vt100_default_scroll_region();
   // cursor down
@@ -743,48 +734,6 @@ void vt100_full_screen()
   vt100_putc( 'H' );
 }
 #endif
-
-
-void reset_terminal_mode()
-{
-  int r;
-  if(VT52_mode)
-    vt100_exit_vt52_mode();
-  else
-  {
-    if(VT100_color)
-      vt100_default_color();
-    if(VT100_scroll)
-      vt100_reset();
-  }
-  r = ioctl(0, TCSETS, &orig_termios);
-}
-#if USE_TERMIOS
-#endif /* USE_TERMIOS */
-
-
-/**
- * initialize the serial communication parameters.
- * We also put some timer initialization here. 
- */
-void terminal_initialize( void ) {
-  int r;
-  char buf[2];
-
-  buf[1] = 0;
-
-  r = ioctl(0, TCGETS, &orig_termios);
-  current_termios = orig_termios;
-
-  current_termios.c_lflag &= ~(ECHO | ICANON | ISIG);
-
-  current_termios.c_cc[VMIN] = 0;
-  current_termios.c_cc[VTIME] = 1; // *0.1s timeout
-
-  r = ioctl(0, TCSETS, &current_termios);
-
-  atexit(reset_terminal_mode);
-}
 
 
 /** 
@@ -863,6 +812,7 @@ void vt100_itoa( unsigned char val ) {
   vt100_putc( vt100_hex( c ));
 }
 
+
 /**
  * move the VT100 cursor to the given position.
  * This is done by sending 'ESC Y l c'
@@ -888,6 +838,7 @@ void vt100_goto( unsigned char row, unsigned char col )
     vt100_putc( 'H' );  // set cursor
   }
 }
+
 
 void vt100_bgcolor(unsigned char color)
 {
@@ -953,6 +904,49 @@ void block_color(unsigned char paintMode)
       vt100_bgcolor(bgcolor);
     }
   }
+}
+
+
+void reset_terminal_mode()
+{
+  int r;
+  if(VT52_mode)
+    vt100_exit_vt52_mode();
+  else
+  {
+    if(VT100_color)
+      vt100_default_color();
+    if(VT100_scroll)
+    {
+      vt100_default_scroll_region();
+      vt100_goto(23,0);
+    }
+  }
+  r = ioctl(0, TCSETS, &orig_termios);
+}
+
+
+/**
+ * initialize the serial communication parameters.
+ * We also put some timer initialization here. 
+ */
+void terminal_initialize( void ) {
+  int r;
+  char buf[2];
+
+  buf[1] = 0;
+
+  r = ioctl(0, TCGETS, &orig_termios);
+  current_termios = orig_termios;
+
+  current_termios.c_lflag &= ~(ECHO | ICANON | ISIG);
+
+  current_termios.c_cc[VMIN] = 0;
+  current_termios.c_cc[VTIME] = 1; // *0.1s timeout
+
+  r = ioctl(0, TCSETS, &current_termios);
+
+  atexit(reset_terminal_mode);
 }
 
 
