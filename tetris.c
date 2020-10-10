@@ -1301,10 +1301,13 @@ void init_game( void ) {
   clear_board();
   display_board(ROWSD);
 
-  active_pool = 0;
-  for(i = 0; i < 14; i++)
+  for(i = 0; i < 7; i++)
+  {
+    active_pool = 1;
     shuffle_inactive_pool();
-  active_pool = 1;
+    active_pool = 0;
+    shuffle_inactive_pool();
+  }
   current_row = ROWNEW;
   current_col = COLNEW;
   create_random_block();
