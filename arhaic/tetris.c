@@ -1329,7 +1329,7 @@ void set_read_timeout()
   if(time_diff > MS_TIMEOUT) /* if(time_ms()>time_next_ms) */
   {
     current_termios.c_cc[VTIME] = 0;
-    if(time_diff < MS_WRAPAROUND-500)
+    if(time_diff < MS_WRAPAROUND-step_ms)
       time_next_ms = time_ms(); /* CPU too slow, >0.5s late -> skew */
   }
   else
@@ -1491,6 +1491,12 @@ void check_handle_command()
        */
       if(INFINITE_time)
         cmd_move_down();
+      else
+      {
+        /* after drop, reset step time to proprely delay final "stick" */
+        time_next_ms = time_ms();
+        set_next_step_timeout();
+      }
       break;
 
     case CMD_REDRAW: /* redraw everything */
