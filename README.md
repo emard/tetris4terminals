@@ -15,3 +15,5 @@ Few usage examples:
     ./tetris             : default tetris for VT100 color
     ./tetris -h          : print options and key usage
     ./tetris > /dev/tty1 : take input from stdin, draw on /dev/tty1 terminal
+
+![Sceenshot](/pic/tetris.png)
