@@ -16,4 +16,31 @@ Few usage examples:
     ./tetris -h          : print options and key usage
     ./tetris > /dev/tty1 : take input from stdin, draw on /dev/tty1 terminal
 
+# Screenshot
+
+    ||                    ||
+    ||                    ||
+    ||                    ||
+    ||                    ||
+    ||                    ||
+    ||        HH          ||
+    ||        HHHHHH      ||
+    ||                    ||
+    ||                    ||
+    ||                    ||
+    ||                    ||
+    ||  XX                ||
+    ||XXXXXX    XXXXXXXX  ||
+    ||XXXXXXXXXXXXXX  XXXX||
+    ||XXXXXXXX  XXXXXXXX  ||
+    ||XXXX  XXXXXX    XX  ||
+    ||XXXXXXXX  XXXXXXXXXX||
+    ||  XXXXXXXXXXXX  XXXX||
+    ||XXXXXXXX  XXXXXXXXXX||
+    ||XXXX  XXXXXXXX  XXXX||
+    ||XXXXXXXX  XX    XXXX||            Level: 01 
+    ||  XX  XXXXXXXXXXXXXX||            Score: 0010
+    ||  XXXXXXXX    XXXX  ||
+    ||||||||||||||||||||||||
+
 ![Sceenshot](/pic/tetris.png)
