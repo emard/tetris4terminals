@@ -147,8 +147,10 @@
 #define CHAR_SPACE  ' '
 #define CHAR_WALL   '|'
 #define CHAR_FLOOR  '|'
-#define CHAR_ACTIVE 'H'
+#define CHAR_ACTIVE       block_name[current_index]
+#define CHAR_ACTIVE_FIXED block_name[current_index]
 #define CHAR_FIXED  'X'
+
 
 // 1-single char (for 8x8 font), 2-double char (for 8x16 font) ...
 unsigned char DRAW_multi = 2;
@@ -254,6 +256,8 @@ static unsigned char  command;
 unsigned char shuffled_pool[2][7] = { {0,1,2,3,4,5,6}, {0,1,2,3,4,5,6} };
 unsigned char active_pool = 0; // alternates 0/1
 unsigned char pool_index = 0; // 0-7
+
+char *block_name = "OTISZLJ";
 
 // VT100 block colors (first 8 matters)
 unsigned char index2color[] = {
@@ -963,7 +967,7 @@ void display_block( unsigned char paintMode ) {
       if (getBlockPixel(i,j)) {
         vt100_goto( rr-ROW0, cc*DRAW_multi );
         if     (paintMode == PAINT_ACTIVE) draw = CHAR_ACTIVE;
-        else if (paintMode == PAINT_FIXED) draw = CHAR_FIXED;
+        else if (paintMode == PAINT_FIXED) draw = CHAR_ACTIVE_FIXED;
         else                               draw = CHAR_SPACE;
         for(k = 0; k < DRAW_multi; k++)
           vt100_putc(draw);
