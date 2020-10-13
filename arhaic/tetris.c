@@ -194,10 +194,10 @@ long step_ms; /* time step of the piece to fall one tile */
 #define MS_WRAPAROUND 10000
 /* starts game with step 1 s at level 1, it's a longest step time */
 #define MS_STEP_START 1000
+#define STEP_FASTER(x) x*3/4
 /* timeout should be more than longest step time */
 #define MS_TIMEOUT    (MS_STEP_START+500)
 
-#define STEP_FASTER(x) x*3/4
 
 #define ROWS  ((unsigned char) 24) /* must be divisible by 8 */
 #define COLS  ((unsigned char) 10)
@@ -211,11 +211,12 @@ long step_ms; /* time step of the piece to fall one tile */
 #define PAINT_ACTIVE ((unsigned char) 1)
 #define ERASE        ((unsigned char) 0)
 
-#define XOFFSET ((unsigned char) 3)
+#define XOFFSET ((unsigned char) 2)
 #define XLIMIT  ((unsigned char) (XOFFSET+COLS))
 
 #define BOARD_BYTES ((ROWS>>3)*10)
 
+static unsigned char free_rows;
 static unsigned char board[BOARD_BYTES];  /* the main game-board */
 
 static unsigned char current_index;     /* index of the current block (for colorization) */
@@ -1049,25 +1050,27 @@ void display_block( paintMode )
  * This method redraws the whole gaming board including borders.
  * Use another call to display_block() to also draw the current block.
  */
-void display_board( rows )
-  unsigned char rows;
+void display_board( rows, walls_only )
+  unsigned char rows, walls_only;
 {
   unsigned char r,c,k;
   unsigned char ch;
 
-  vt100_cursor_home();
   for( r=0; r < rows; r++ ) {
 
-    vt100_goto( r, 2*DRAW_multi );
+    vt100_goto( r, (XOFFSET-1)*DRAW_multi );
 
     for(k = 0; k < DRAW_multi; k++)
       vt100_putc( CHAR_WALL ); /* one row of the board: border, data, border */
 
-    for( c=0; c < COLS; c++ ) {
-      ch = occupied(r+ROW0,c) ? CHAR_FIXED : CHAR_SPACE;
-      for(k = 0; k < DRAW_multi; k++)
-        vt100_putc( ch );
-    }
+    if(walls_only)
+      vt100_goto( r, (XOFFSET+COLS)*DRAW_multi );
+    else
+      for( c=0; c < COLS; c++ ) {
+        ch = occupied(r+ROW0,c) ? CHAR_FIXED : CHAR_SPACE;
+        for(k = 0; k < DRAW_multi; k++)
+          vt100_putc( ch );
+      }
     for(k = 0; k < DRAW_multi; k++)
       vt100_putc( CHAR_WALL );
     
@@ -1083,7 +1086,7 @@ void display_board( rows )
   if(r == ROWSD)
   {
     /* print floor */
-    vt100_goto( r, 2*DRAW_multi );
+    vt100_goto( r, (XOFFSET-1)*DRAW_multi );
     for(k = 0; k < DRAW_multi*(COLS+2); k++)
       vt100_putc( CHAR_FLOOR );
   }
@@ -1176,6 +1179,10 @@ void check_remove_completed_rows()
       }
     }
   }
+
+  if(current_row < free_rows)
+    free_rows = current_row;
+  free_rows += removed;
   
   if (removed) {
     vt100_beep();
@@ -1184,9 +1191,9 @@ void check_remove_completed_rows()
     {
       if(VT100_scroll)
         /* redraw scrolled out walls on top */
-        display_board(removed);
+        display_board(removed,1);
       else
-        display_board(ROWSD);
+        display_board(ROWSD,0);
       if(VT100_color)
         vt100_default_color();
     }
@@ -1380,8 +1387,9 @@ void init_game()
       vt100_default_color();
   vt100_clear_screen();
   clear_board();
-  display_board(ROWSD);
+  display_board(ROWSD,0);
 
+  free_rows = ROWS;
   for(i = 0; i < 7; i++)
   {
     active_pool = 1;
@@ -1434,16 +1442,22 @@ void check_handle_command()
     return;
   }
 	
-  /* first check game status and a possible timeout. 
-   * (we don't want the user to block timeouts by just overflowing
-   * us with keystrokes :-))
-  */
+  /* first check game status and a possible timeout. */
   if (timeout()) {
-    display_block( ERASE );
+    tmp = ~VT52_mode && VT100_scroll && current_row > ROW0 && current_row < free_rows-ROW0-2;
+    if(tmp)
+    { /* hardware scroll */
+      vt100_default_color();
+      vt100_scroll_region_down(free_rows-1-ROW0);
+      display_board(1,1); /* repaint top row */
+      vt100_cursor_home();
+    }
+    else
+      display_block( ERASE );
     cmd_move_down();
-    display_block( PAINT_ACTIVE );
-    state |= TIMEOUT;
-    state ^= TIMEOUT; // reset timeout flag
+    if(tmp == 0)
+      display_block( PAINT_ACTIVE );
+    state &= ~TIMEOUT; // reset timeout flag
     return;
   }
 
@@ -1510,7 +1524,7 @@ void check_handle_command()
         if(VT100_color)
           vt100_default_color();
       vt100_clear_screen();
-      display_board(ROWSD);
+      display_board(ROWSD,0);
       display_score();
       display_block( PAINT_ACTIVE );
       break;
