@@ -1366,7 +1366,8 @@ void check_handle_command( void ) {
 
   // first check game status and a possible timeout.
   if (timeout()) {
-    tmp = ~VT52_mode && VT100_scroll && current_row > ROW0 && current_row < free_rows-ROW0-2;
+    // decide hardware scroll or repaint
+    tmp = ~VT52_mode && VT100_scroll && current_row > ROW0 && current_row < free_rows-ROW0-3;
     if(tmp)
     { /* hardware scroll */
       vt100_default_color();
