@@ -1100,6 +1100,7 @@ void check_remove_completed_rows( void ) {
     if (is_complete_row(r)) {
       removed++;
       remove_row( r );
+      score += SCORE_PER_ROW;
       if(VT52_mode == 0)
         if(VT100_scroll)
           vt100_scroll_region_down(r-ROW0);
