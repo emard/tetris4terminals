@@ -1351,6 +1351,7 @@ bit timeout( void ) {
 
 void check_handle_command( void ) {
   unsigned char tmp;
+  signed char previous_row;
 
   if(command == CMD_QUIT || command == CMD_CTRLC)
     exit(0);
@@ -1420,6 +1421,7 @@ void check_handle_command( void ) {
 
     case CMD_DROP: // drop the current block
       display_block( ERASE );
+      previous_row = current_row;
       for( ; test_if_block_fits(); )
         current_row++;
 	            
@@ -1433,7 +1435,7 @@ void check_handle_command( void ) {
       // and not allow to move it left-right after dropping
       if(INFINITE_time)
         cmd_move_down();
-      else
+      else if (current_row != previous_row)
       {
         /* after drop, reset step time to proprely delay final "stick" */
         time_next_ms = time_ms();
