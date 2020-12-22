@@ -463,15 +463,17 @@ void create_rotated_block( unsigned char index, unsigned char rotation ) {
 // exchange 2 random indices
 void shuffle_inactive_pool()
 {
-  unsigned char x = 7, y = 7;
-  unsigned char i, t;
-  while(x == 7)
-    x = rand() & 7;
-  while(y == 7 || y == x)
-    y = rand() & 7;
-  // x=0..6 y=0..6
+  unsigned char x, y, i, t;
   i = active_pool ^ 1; // inactive pool
-  // exchange using temprary var
+  /* loop to prevent same piece appearing twice when switching pools */
+  do
+  {
+    do { x = rand() & 7; } while(x == 7);
+    do { y = rand() & 7; } while(y == 7 || y == x);
+    if (y == 0) { y = x; x = 0; } /* if y=0 swap x and y */
+  } while(x == 0 && shuffled_pool[active_pool][6] == shuffled_pool[i][y]);
+  /* x=0..6 y=0..6 */
+  /* exchange using temprary var */
   t = shuffled_pool[i][x];
   shuffled_pool[i][x] = shuffled_pool[i][y];
   shuffled_pool[i][y] = t;
