@@ -1425,7 +1425,7 @@ void check_handle_command( void ) {
       previous_row = current_row;
       for( ; test_if_block_fits(); )
         current_row++;
-	            
+
       // now one step back, then paint the block in its
       // final position and allow to move left-right
       // before sticking it finally
