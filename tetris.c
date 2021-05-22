@@ -1044,7 +1044,7 @@ void erase_score( void ) {
  * display the current level and score values on the terminal.
  */
 void display_score( void ) {
-  vt100_goto( 20, 40 );
+  vt100_goto( 22, 40 );
 #if 1
   vt100_putc( 'L' );
   vt100_putc( 'e' );
@@ -1058,7 +1058,7 @@ void display_score( void ) {
 
   vt100_putc( ' ' );
 #if 1
-  vt100_goto( 21, 40 );
+  vt100_goto( 23, 40 );
   vt100_putc( 'S' );
   vt100_putc( 'c' );
   vt100_putc( 'o' );
@@ -1374,7 +1374,7 @@ void check_handle_command( void ) {
     if(tmp)
     { /* hardware scroll */
       vt100_default_color();
-      vt100_scroll_region_down(free_rows-1-ROW0);
+      vt100_scroll_region_down(current_row+3);
       display_board(1,1); /* repaint top row */
       vt100_cursor_home();
     }
