@@ -901,6 +901,12 @@ void block_color(unsigned char paintMode)
   }
 }
 
+void vt_default_color()
+{
+  if(VT52_mode == 0)
+    if(VT100_color)
+       vt100_default_color();
+}
 
 void reset_terminal_mode()
 {
@@ -909,8 +915,7 @@ void reset_terminal_mode()
     vt100_exit_vt52_mode();
   else
   {
-    if(VT100_color)
-      vt100_default_color();
+    vt_default_color();
     if(VT100_scroll)
     {
       vt100_default_scroll_region();
@@ -1044,9 +1049,7 @@ void erase_score( void ) {
  * display the current level and score values on the terminal.
  */
 void display_score( void ) {
-  if(VT52_mode == 0)
-    if(VT100_color)
-       vt100_default_color();
+  vt_default_color();
   vt100_goto( 22, 30 );
 #if 1
   vt100_putc( 'L' );
@@ -1093,8 +1096,7 @@ void check_remove_completed_rows( void ) {
 
   if(VT52_mode == 0)
   {
-    if(VT100_color)
-      vt100_default_color();
+    vt_default_color();
     if(VT100_scroll)
       if(removed)
         erase_score();
@@ -1135,8 +1137,6 @@ void check_remove_completed_rows( void ) {
         display_board(removed,1);
       else
         display_board(ROWSD,0);
-      if(VT100_color)
-        vt100_default_color();
     }
     display_score();
   }
@@ -1221,9 +1221,6 @@ void cmd_move_down( void ) {
   score += SCORE_PER_BLOCK;
   
   display_block( PAINT_ACTIVE );
-  if(VT52_mode == 0)
-    if(VT100_color)
-       vt100_default_color();
   display_score();
 }
 
@@ -1317,8 +1314,7 @@ void init_game( void ) {
   if(VT52_mode)
     vt100_enter_vt52_mode();
   else
-    if(VT100_color)
-      vt100_default_color();
+    vt_default_color();
   vt100_clear_screen();
   clear_board();
   display_board(ROWSD,0);
@@ -1381,7 +1377,7 @@ void check_handle_command( void ) {
     tmp = ~VT52_mode && VT100_scroll && current_row > ROW0 && current_row < free_rows-ROW0-3;
     if(tmp)
     { /* hardware scroll */
-      vt100_default_color();
+      vt_default_color();
       vt100_scroll_region_down(current_row+3);
       display_board(1,1); /* repaint top row */
       vt100_cursor_home();
@@ -1453,9 +1449,7 @@ void check_handle_command( void ) {
       break;
 
     case CMD_REDRAW: // redraw everything
-      if(VT52_mode == 0)
-        if(VT100_color)
-          vt100_default_color();
+      vt_default_color();
       vt100_clear_screen();
       display_board(ROWSD,0);
       display_score();
