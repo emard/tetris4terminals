@@ -238,10 +238,10 @@ static unsigned int  score;
 #define GAME_OVER    ((unsigned char) 0x8) 
 
 #define CMD_NONE     ((unsigned char) 0)
-#define CMD_LEFT     ((unsigned char) 'j')
-#define CMD_RIGHT    ((unsigned char) 'l')
-#define CMD_ROTATE_CCW ((unsigned char) 'k')
-#define CMD_ROTATE_CW  ((unsigned char) 'i')
+#define CMD_LEFT     ((unsigned char) '4')
+#define CMD_RIGHT    ((unsigned char) '6')
+#define CMD_ROTATE_CCW ((unsigned char) '5')
+#define CMD_ROTATE_CW  ((unsigned char) '8')
 #define CMD_DROP     ((unsigned char) ' ')
 #define CMD_REDRAW   ((unsigned char) 'r')
 #define CMD_START    ((unsigned char) 's')
@@ -1044,7 +1044,10 @@ void erase_score( void ) {
  * display the current level and score values on the terminal.
  */
 void display_score( void ) {
-  vt100_goto( 22, 40 );
+  if(VT52_mode == 0)
+    if(VT100_color)
+       vt100_default_color();
+  vt100_goto( 22, 30 );
 #if 1
   vt100_putc( 'L' );
   vt100_putc( 'e' );
@@ -1056,9 +1059,10 @@ void display_score( void ) {
 #endif
   vt100_xtoa( level );
 
-  vt100_putc( ' ' );
 #if 1
-  vt100_goto( 23, 40 );
+  vt100_putc( ' ' );
+  vt100_putc( ' ' );
+  //vt100_goto( 23, 40 );
   vt100_putc( 'S' );
   vt100_putc( 'c' );
   vt100_putc( 'o' );
@@ -1217,6 +1221,10 @@ void cmd_move_down( void ) {
   score += SCORE_PER_BLOCK;
   
   display_block( PAINT_ACTIVE );
+  if(VT52_mode == 0)
+    if(VT100_color)
+       vt100_default_color();
+  display_score();
 }
 
 
