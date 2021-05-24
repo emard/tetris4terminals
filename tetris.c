@@ -1340,6 +1340,7 @@ void init_game( void ) {
 
   state = STATE_IDLE;
   command = CMD_NONE;
+  display_score();
   display_block( PAINT_ACTIVE );
 }
 
