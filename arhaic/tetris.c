@@ -939,6 +939,14 @@ void block_color(paintMode)
 }
 
 
+void vt_default_color()
+{
+  if(VT52_mode == 0)
+    if(VT100_color)
+       vt100_default_color();
+}
+
+
 void reset_terminal_mode()
 {
   int r;
@@ -946,8 +954,7 @@ void reset_terminal_mode()
     vt100_exit_vt52_mode();
   else
   {
-    if(VT100_color)
-      vt100_default_color();
+    vt_default_color();
     if(VT100_scroll)
     {
       vt100_default_scroll_region();
@@ -1091,7 +1098,8 @@ void erase_score()
  */
 void display_score()
 {
-  vt100_goto( 22, 40 );
+  vt_default_color();
+  vt100_goto( 22, 30 );
 #if 1
   vt100_putc( 'L' );
   vt100_putc( 'e' );
@@ -1103,9 +1111,9 @@ void display_score()
 #endif
   vt100_xtoa( level );
 
-  vt100_putc( ' ' );
 #if 1
-  vt100_goto( 23, 40 );
+  vt100_putc( ' ' );
+  vt100_putc( ' ' );
   vt100_putc( 'S' );
   vt100_putc( 'c' );
   vt100_putc( 'o' );
@@ -1137,8 +1145,7 @@ void check_remove_completed_rows()
 
   if(VT52_mode == 0)
   {
-    if(VT100_color)
-      vt100_default_color();
+    vt_default_color();
     if(VT100_scroll)
       if(removed)
         erase_score();
@@ -1367,8 +1374,7 @@ void init_game()
   if(VT52_mode)
     vt100_enter_vt52_mode();
   else
-    if(VT100_color)
-      vt100_default_color();
+    vt_default_color();
   vt100_clear_screen();
   clear_board();
   display_board(ROWSD,0);
@@ -1394,6 +1400,7 @@ void init_game()
 
   state = STATE_IDLE;
   command = CMD_NONE;
+  display_score();
   display_block( PAINT_ACTIVE );
 }
 
@@ -1432,7 +1439,7 @@ void check_handle_command()
     tmp = ~VT52_mode && VT100_scroll && current_row > ROW0 && current_row < free_rows-ROW0-3;
     if(tmp)
     { /* hardware scroll */
-      vt100_default_color();
+      vt_default_color();
       vt100_scroll_region_down(current_row+3);
       display_board(1,1); /* repaint top row */
       vt100_cursor_home();
@@ -1505,9 +1512,7 @@ void check_handle_command()
       break;
 
     case CMD_REDRAW: /* redraw everything */
-      if(VT52_mode == 0)
-        if(VT100_color)
-          vt100_default_color();
+      vt_default_color();
       vt100_clear_screen();
       display_board(ROWSD,0);
       display_score();
