@@ -710,6 +710,7 @@ void vt100_exit_vt52_mode( void ) {
   vt100_putc( '<' );
 }
 
+
 void vt100_default_color()
 {
   vt100_putc( 27 );
@@ -900,6 +901,7 @@ void block_color(unsigned char paintMode)
     }
   }
 }
+
 
 void vt_default_color()
 {
