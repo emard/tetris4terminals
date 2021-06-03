@@ -1122,8 +1122,9 @@ void display_score()
   vt100_putc( ':' );
   vt100_putc( ' ' );
 #endif
-  vt100_xtoa( (score/100) );
-  vt100_xtoa( (score%100) );
+  vt100_xtoa( score/10000 );
+  vt100_xtoa( score%10000/100 );
+  vt100_xtoa( score%100 );
   vt100_putc( '\n' );
 }
 
@@ -1156,6 +1157,7 @@ void check_remove_completed_rows()
     if (is_complete_row(r)) {
       removed++;
       remove_row( r );
+      score += SCORE_PER_ROW*(level+1);
       if(VT52_mode == 0)
         if(VT100_scroll)
           vt100_scroll_region_down(r-ROW0);
@@ -1185,8 +1187,6 @@ void check_remove_completed_rows()
         display_board(removed,1);
       else
         display_board(ROWSD,0);
-      if(VT100_color)
-        vt100_default_color();
     }
     display_score();
   }
@@ -1277,9 +1277,10 @@ void cmd_move_down()
   current_col = COLNEW;
   
   create_random_block();
-  score += SCORE_PER_BLOCK;
+  score += SCORE_PER_BLOCK*(level+1);
   
   display_block( PAINT_ACTIVE );
+  display_score();
 }
 
 
@@ -1391,7 +1392,7 @@ void init_game()
   current_col = COLNEW;
   create_random_block();
 
-  score = SCORE_PER_BLOCK;  /* one block created right now */
+  score = 0;
   lines = 0;
   level = 1;
   time_next_ms = time_ms();
