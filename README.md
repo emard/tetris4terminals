@@ -44,3 +44,5 @@ Few usage examples:
     ||||||||||||||||||||||||
 
 ![Sceenshot](/pic/tetris.png)
+
+[Playing tips](https://tetris.fandom.com/wiki/Playing_forever)
