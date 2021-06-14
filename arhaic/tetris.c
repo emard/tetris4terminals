@@ -243,6 +243,7 @@ static unsigned int  score;
 #define CMD_RIGHT    ((unsigned char) 'l')
 #define CMD_ROTATE_CCW ((unsigned char) 'k')
 #define CMD_ROTATE_CW  ((unsigned char) 'i')
+#define CMD_DOWN     ((unsigned char) 'y')
 #define CMD_DROP     ((unsigned char) ' ')
 #define CMD_REDRAW   ((unsigned char) 'r')
 #define CMD_START    ((unsigned char) 's')
@@ -1435,7 +1436,7 @@ void check_handle_command()
   }
 	
   /* first check game status and a possible timeout. */
-  if (timeout()) {
+  if (timeout() || command == CMD_DOWN) {
     // decide hardware scroll or repaint
     tmp = ~VT52_mode && VT100_scroll && current_row > ROW0 && current_row < free_rows-ROW0-3;
     if(tmp)
